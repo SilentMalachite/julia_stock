@@ -1,0 +1,177 @@
+<% @extends(:app) %>
+
+<% @section(:title) %>
+<%= @stock.product_name %> - 在庫詳細
+<% @endsection %>
+
+<% @section(:content) %>
+<div class="row">
+    <div class="col-12">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="/stocks">在庫一覧</a></li>
+                <li class="breadcrumb-item active"><%= @stock.product_name %></li>
+            </ol>
+        </nav>
+        
+        <h1 class="mb-4">
+            <i class="fas fa-box"></i> <%= @stock.product_name %>
+        </h1>
+        
+        <div class="row">
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">基本情報</h5>
+                    </div>
+                    <div class="card-body">
+                        <dl class="row">
+                            <dt class="col-sm-3">商品コード</dt>
+                            <dd class="col-sm-9"><%= @stock.product_code %></dd>
+                            
+                            <dt class="col-sm-3">商品名</dt>
+                            <dd class="col-sm-9"><%= @stock.product_name %></dd>
+                            
+                            <dt class="col-sm-3">カテゴリ</dt>
+                            <dd class="col-sm-9"><%= @stock.category %></dd>
+                            
+                            <dt class="col-sm-3">在庫数</dt>
+                            <dd class="col-sm-9">
+                                <%= ViewHelpers.format_quantity(@stock.quantity, @stock.unit) %>
+                                <% if @stock.quantity == 0 %>
+                                    <span class="badge bg-danger ms-2">在庫切れ</span>
+                                <% elseif @stock.quantity < 10 %>
+                                    <span class="badge bg-warning ms-2">低在庫</span>
+                                <% else %>
+                                    <span class="badge bg-success ms-2">在庫あり</span>
+                                <% end %>
+                            </dd>
+                            
+                            <dt class="col-sm-3">単価</dt>
+                            <dd class="col-sm-9"><%= ViewHelpers.format_currency(@stock.price) %></dd>
+                            
+                            <dt class="col-sm-3">在庫金額</dt>
+                            <dd class="col-sm-9">
+                                <strong><%= ViewHelpers.format_currency(@stock.quantity * @stock.price) %></strong>
+                            </dd>
+                            
+                            <dt class="col-sm-3">保管場所</dt>
+                            <dd class="col-sm-9"><%= @stock.location %></dd>
+                            
+                            <dt class="col-sm-3">登録日時</dt>
+                            <dd class="col-sm-9"><%= ViewHelpers.format_datetime(@stock.created_at) %></dd>
+                            
+                            <dt class="col-sm-3">更新日時</dt>
+                            <dd class="col-sm-9"><%= ViewHelpers.format_datetime(@stock.updated_at) %></dd>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-4">
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <h5 class="mb-0">操作</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="d-grid gap-2">
+                            <a href="/stocks/<%= @stock.id %>/edit" class="btn btn-primary">
+                                <i class="fas fa-edit"></i> 編集
+                            </a>
+                            
+                            <button type="button" class="btn btn-info" data-bs-toggle="modal" data-bs-target="#adjustmentModal">
+                                <i class="fas fa-balance-scale"></i> 在庫調整
+                            </button>
+                            
+                            <form method="POST" action="/stocks/<%= @stock.id %>">
+                                <input type="hidden" name="_method" value="DELETE">
+                                <button type="submit" class="btn btn-danger w-100" onclick="return confirm('本当に削除しますか？')">
+                                    <i class="fas fa-trash"></i> 削除
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">クイック情報</h5>
+                    </div>
+                    <div class="card-body">
+                        <canvas id="stockChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 在庫調整モーダル -->
+<div class="modal fade" id="adjustmentModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">在庫調整</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="/stocks/<%= @stock.id %>/adjust">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">現在の在庫数</label>
+                        <input type="text" class="form-control" value="<%= ViewHelpers.format_quantity(@stock.quantity, @stock.unit) %>" readonly>
+                    </div>
+                    <div class="mb-3">
+                        <label for="adjustment_type" class="form-label">調整タイプ</label>
+                        <select name="adjustment_type" id="adjustment_type" class="form-select" required>
+                            <option value="add">追加</option>
+                            <option value="subtract">減少</option>
+                            <option value="set">設定</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="adjustment_quantity" class="form-label">数量</label>
+                        <input type="number" name="adjustment_quantity" id="adjustment_quantity" class="form-control" min="0" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="adjustment_reason" class="form-label">理由</label>
+                        <textarea name="adjustment_reason" id="adjustment_reason" class="form-control" rows="3"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
+                    <button type="submit" class="btn btn-primary">調整実行</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<% @endsection %>
+
+<% @section(:scripts) %>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+// 在庫推移チャート（ダミーデータ）
+const ctx = document.getElementById('stockChart').getContext('2d');
+new Chart(ctx, {
+    type: 'line',
+    data: {
+        labels: ['1週間前', '6日前', '5日前', '4日前', '3日前', '2日前', '1日前', '今日'],
+        datasets: [{
+            label: '在庫数',
+            data: [<%= @stock.quantity + 20 %>, <%= @stock.quantity + 15 %>, <%= @stock.quantity + 18 %>, <%= @stock.quantity + 10 %>, <%= @stock.quantity + 8 %>, <%= @stock.quantity + 5 %>, <%= @stock.quantity + 2 %>, <%= @stock.quantity %>],
+            borderColor: 'rgb(75, 192, 192)',
+            tension: 0.1
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                display: false
+            }
+        }
+    }
+});
+</script>
+<% @endsection %>

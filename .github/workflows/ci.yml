@@ -1,0 +1,97 @@
+name: CI
+
+on:
+  push:
+    branches: [ "main", "develop" ]
+  pull_request:
+    branches: [ "main", "develop" ]
+
+jobs:
+  test:
+    name: Julia ${{ matrix.version }} - ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        version:
+          - '1.9'
+          - '1.10'
+          - '1.11'
+        os:
+          - ubuntu-latest
+          - windows-latest
+          - macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: julia-actions/setup-julia@v1
+        with:
+          version: ${{ matrix.version }}
+          
+      - uses: julia-actions/cache@v1
+      
+      - name: Install dependencies
+        run: |
+          julia --project=. -e "using Pkg; Pkg.instantiate()"
+          
+      - name: Run tests
+        run: |
+          julia --project=. -e "using Pkg; Pkg.test(coverage=true)"
+          
+      - uses: julia-actions/julia-processcoverage@v1
+      
+      - uses: codecov/codecov-action@v3
+        with:
+          files: lcov.info
+
+  security:
+    name: Security Analysis
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: julia-actions/setup-julia@v1
+        with:
+          version: '1.11'
+          
+      - name: Install dependencies
+        run: |
+          julia --project=. -e "using Pkg; Pkg.instantiate()"
+          
+      - name: Run security tests
+        run: |
+          julia --project=. test/test_security.jl
+
+  integration:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: julia-actions/setup-julia@v1
+        with:
+          version: '1.11'
+          
+      - name: Install dependencies
+        run: |
+          julia --project=. -e "using Pkg; Pkg.instantiate()"
+          
+      - name: Run integration tests
+        run: |
+          julia --project=. test/test_integration.jl
+
+  docker:
+    name: Docker Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        
+      - name: Build Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: false
+          tags: julia-stock:latest

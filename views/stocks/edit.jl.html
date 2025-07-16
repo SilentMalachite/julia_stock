@@ -1,0 +1,134 @@
+<% @extends(:app) %>
+
+<% @section(:title) %>
+<%= @stock.product_name %> - 編集
+<% @endsection %>
+
+<% @section(:content) %>
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="/stocks">在庫一覧</a></li>
+                <li class="breadcrumb-item"><a href="/stocks/<%= @stock.id %>"><%= @stock.product_name %></a></li>
+                <li class="breadcrumb-item active">編集</li>
+            </ol>
+        </nav>
+        
+        <h1 class="mb-4">
+            <i class="fas fa-edit"></i> 在庫情報編集
+        </h1>
+        
+        <div class="card">
+            <div class="card-body">
+                <form method="POST" action="/stocks/<%= @stock.id %>">
+                    <input type="hidden" name="_method" value="PUT">
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <%= ViewHelpers.form_input("product_code", @stock.product_code, 
+                                label="商品コード", 
+                                required=true) %>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <%= ViewHelpers.form_input("product_name", @stock.product_name, 
+                                label="商品名", 
+                                required=true) %>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <%= ViewHelpers.form_select("category", 
+                                [("電子機器", "電子機器"), 
+                                 ("事務用品", "事務用品"), 
+                                 ("消耗品", "消耗品"), 
+                                 ("その他", "その他")], 
+                                @stock.category,
+                                label="カテゴリ", 
+                                required=true) %>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <%= ViewHelpers.form_input("location", @stock.location, 
+                                label="保管場所", 
+                                required=true) %>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-4">
+                            <%= ViewHelpers.form_input("quantity", string(@stock.quantity), 
+                                type="number", 
+                                label="在庫数", 
+                                required=true) %>
+                        </div>
+                        
+                        <div class="col-md-4">
+                            <%= ViewHelpers.form_select("unit", 
+                                [("個", "個"), 
+                                 ("箱", "箱"), 
+                                 ("セット", "セット"), 
+                                 ("本", "本"),
+                                 ("枚", "枚"),
+                                 ("台", "台")], 
+                                @stock.unit,
+                                label="単位", 
+                                required=true) %>
+                        </div>
+                        
+                        <div class="col-md-4">
+                            <%= ViewHelpers.form_input("price", string(@stock.price), 
+                                type="number", 
+                                label="単価（円）", 
+                                required=true) %>
+                        </div>
+                    </div>
+                    
+                    <%= ViewHelpers.form_textarea("description", get(@stock, :description, ""), 
+                        label="備考", 
+                        rows=4) %>
+                    
+                    <div class="alert alert-info mt-3">
+                        <i class="fas fa-info-circle"></i> 
+                        最終更新: <%= ViewHelpers.format_datetime(@stock.updated_at) %>
+                    </div>
+                    
+                    <div class="form-group mt-4">
+                        <div class="row">
+                            <div class="col-6">
+                                <a href="/stocks/<%= @stock.id %>" class="btn btn-secondary w-100">
+                                    <i class="fas fa-times"></i> キャンセル
+                                </a>
+                            </div>
+                            <div class="col-6">
+                                <%= ViewHelpers.form_button("更新", 
+                                    type="submit", 
+                                    class="btn btn-primary w-100") %>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <div class="card mt-3 border-danger">
+            <div class="card-header bg-danger text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-exclamation-triangle"></i> 危険な操作
+                </h5>
+            </div>
+            <div class="card-body">
+                <p>この在庫データを削除すると、関連する全ての履歴も削除されます。</p>
+                <form method="POST" action="/stocks/<%= @stock.id %>" class="d-inline">
+                    <input type="hidden" name="_method" value="DELETE">
+                    <button type="submit" class="btn btn-danger" onclick="return confirm('本当に削除しますか？この操作は取り消せません。')">
+                        <i class="fas fa-trash"></i> この在庫を削除
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+<% @endsection %>

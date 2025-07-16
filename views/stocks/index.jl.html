@@ -1,0 +1,112 @@
+<% @extends(:app) %>
+
+<% @section(:title) %>
+在庫一覧
+<% @endsection %>
+
+<% @section(:content) %>
+<div class="row">
+    <div class="col-12">
+        <h1 class="mb-4">
+            <i class="fas fa-boxes"></i> 在庫一覧
+        </h1>
+        
+        <!-- 検索フォーム -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <form method="GET" action="/stocks" class="row g-3">
+                    <div class="col-md-4">
+                        <input type="text" name="search" class="form-control" placeholder="商品名・商品コードで検索" value="<%= params(:search) %>">
+                    </div>
+                    <div class="col-md-3">
+                        <select name="category" class="form-select">
+                            <option value="">全カテゴリ</option>
+                            <% for category in @categories %>
+                                <option value="<%= category %>" <%= params(:category) == category ? "selected" : "" %>><%= category %></option>
+                            <% end %>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <button type="submit" class="btn btn-primary w-100">
+                            <i class="fas fa-search"></i> 検索
+                        </button>
+                    </div>
+                    <div class="col-md-3">
+                        <a href="/stocks/new" class="btn btn-success w-100">
+                            <i class="fas fa-plus"></i> 新規登録
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <!-- 在庫テーブル -->
+        <div class="card">
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>商品コード</th>
+                                <th>商品名</th>
+                                <th>カテゴリ</th>
+                                <th class="text-end">在庫数</th>
+                                <th class="text-end">単価</th>
+                                <th>保管場所</th>
+                                <th>更新日時</th>
+                                <th class="text-center">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% for stock in @stocks %>
+                            <tr class="<%= stock.quantity == 0 ? "table-danger" : (stock.quantity < 10 ? "table-warning" : "") %>">
+                                <td><%= stock.product_code %></td>
+                                <td>
+                                    <a href="/stocks/<%= stock.id %>">
+                                        <%= stock.product_name %>
+                                    </a>
+                                </td>
+                                <td><%= stock.category %></td>
+                                <td class="text-end">
+                                    <%= ViewHelpers.format_quantity(stock.quantity, stock.unit) %>
+                                    <% if stock.quantity == 0 %>
+                                        <span class="badge bg-danger ms-1">在庫切れ</span>
+                                    <% elseif stock.quantity < 10 %>
+                                        <span class="badge bg-warning ms-1">低在庫</span>
+                                    <% end %>
+                                </td>
+                                <td class="text-end"><%= ViewHelpers.format_currency(stock.price) %></td>
+                                <td><%= stock.location %></td>
+                                <td><%= ViewHelpers.format_datetime(stock.updated_at) %></td>
+                                <td class="text-center">
+                                    <div class="btn-group btn-group-sm">
+                                        <a href="/stocks/<%= stock.id %>/edit" class="btn btn-outline-primary" title="編集">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
+                                        <form method="POST" action="/stocks/<%= stock.id %>" style="display:inline;">
+                                            <input type="hidden" name="_method" value="DELETE">
+                                            <button type="submit" class="btn btn-outline-danger" title="削除" onclick="return confirm('本当に削除しますか？')">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                            <% end %>
+                        </tbody>
+                    </table>
+                </div>
+                
+                <% if isempty(@stocks) %>
+                <div class="text-center py-5">
+                    <p class="text-muted">在庫データがありません。</p>
+                    <a href="/stocks/new" class="btn btn-primary">
+                        <i class="fas fa-plus"></i> 最初の在庫を登録
+                    </a>
+                </div>
+                <% end %>
+            </div>
+        </div>
+    </div>
+</div>
+<% @endsection %>

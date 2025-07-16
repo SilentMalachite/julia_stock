@@ -1,0 +1,163 @@
+# Julia specific
+*.jl.cov
+*.jl.*.cov
+*.jl.mem
+deps/deps.jl
+docs/build/
+docs/site/
+
+# Manifest files (optional, but can be included for reproducibility)
+# Manifest.toml
+
+# Local environment
+.env
+.env.local
+.env.*.local
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+data/*.db
+data/*.sqlite
+data/*.sqlite3
+
+# Logs
+*.log
+logs/
+*.log.*
+
+# Backups
+backups/
+*.backup
+*.bak
+
+# Temporary files
+*.tmp
+*.temp
+/tmp/
+.DS_Store
+Thumbs.db
+
+# Excel files (user data)
+*.xlsx
+*.xls
+data/*.xlsx
+data/*.xls
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS specific
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Julia package development
+.julia/
+.juliahistory
+
+# Docker
+.dockerignore
+docker-compose.override.yml
+
+# Coverage reports
+coverage/
+.coverage
+*.lcov
+
+# Test artifacts
+test/temp/
+test/fixtures/generated/
+
+# Runtime files
+*.pid
+*.seed
+*.sock
+
+# Configuration files with sensitive data
+config/local.jl
+config/production.jl
+config/secrets.jl
+
+# Certificates and keys
+*.pem
+*.key
+*.crt
+*.csr
+*.p12
+*.pfx
+
+# Session files
+sessions/
+*.session
+
+# Cache files
+.cache/
+cache/
+
+# Documentation build
+docs/build/
+docs/site/
+
+# Local development
+dev/
+scratch/
+experiments/
+
+# Performance profiling
+*.prof
+profile/
+
+# Memory dumps
+*.dmp
+*.mdmp
+
+# JetBrains IDEs
+.idea/
+*.iml
+*.iws
+
+# VS Code
+.vscode/
+*.code-workspace
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
+*.swp
+*.swo
+*~
+
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+auto-save-list
+tramp
+.\#*
+
+# System files
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# Local Julia history
+.julia_history
+
+# Local development overrides
+docker-compose.override.yml
+.env.override

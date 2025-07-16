@@ -1,0 +1,129 @@
+<% @extends(:app) %>
+
+<% @section(:title) %>
+新規在庫登録
+<% @endsection %>
+
+<% @section(:content) %>
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="/stocks">在庫一覧</a></li>
+                <li class="breadcrumb-item active">新規登録</li>
+            </ol>
+        </nav>
+        
+        <h1 class="mb-4">
+            <i class="fas fa-plus"></i> 新規在庫登録
+        </h1>
+        
+        <div class="card">
+            <div class="card-body">
+                <form method="POST" action="/stocks">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <%= ViewHelpers.form_input("product_code", "", 
+                                label="商品コード", 
+                                placeholder="例: PRD-001", 
+                                required=true) %>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <%= ViewHelpers.form_input("product_name", "", 
+                                label="商品名", 
+                                placeholder="例: ノートパソコン", 
+                                required=true) %>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <%= ViewHelpers.form_select("category", 
+                                [("電子機器", "電子機器"), 
+                                 ("事務用品", "事務用品"), 
+                                 ("消耗品", "消耗品"), 
+                                 ("その他", "その他")], 
+                                "",
+                                label="カテゴリ", 
+                                required=true) %>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <%= ViewHelpers.form_input("location", "", 
+                                label="保管場所", 
+                                placeholder="例: 倉庫A-1", 
+                                required=true) %>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-4">
+                            <%= ViewHelpers.form_input("quantity", "0", 
+                                type="number", 
+                                label="初期在庫数", 
+                                required=true) %>
+                        </div>
+                        
+                        <div class="col-md-4">
+                            <%= ViewHelpers.form_select("unit", 
+                                [("個", "個"), 
+                                 ("箱", "箱"), 
+                                 ("セット", "セット"), 
+                                 ("本", "本"),
+                                 ("枚", "枚"),
+                                 ("台", "台")], 
+                                "個",
+                                label="単位", 
+                                required=true) %>
+                        </div>
+                        
+                        <div class="col-md-4">
+                            <%= ViewHelpers.form_input("price", "0", 
+                                type="number", 
+                                label="単価（円）", 
+                                required=true) %>
+                        </div>
+                    </div>
+                    
+                    <%= ViewHelpers.form_textarea("description", "", 
+                        label="備考", 
+                        placeholder="商品の詳細説明や注意事項など", 
+                        rows=4) %>
+                    
+                    <div class="form-group mt-4">
+                        <div class="row">
+                            <div class="col-6">
+                                <a href="/stocks" class="btn btn-secondary w-100">
+                                    <i class="fas fa-times"></i> キャンセル
+                                </a>
+                            </div>
+                            <div class="col-6">
+                                <%= ViewHelpers.form_button("登録", 
+                                    type="submit", 
+                                    class="btn btn-primary w-100") %>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-info-circle"></i> 入力のヒント
+                </h5>
+            </div>
+            <div class="card-body">
+                <ul class="mb-0">
+                    <li>商品コードは重複しない一意の値を入力してください</li>
+                    <li>在庫数と単価は後から変更可能です</li>
+                    <li>カテゴリと保管場所は検索時に使用されます</li>
+                    <li>CSVやExcelからの一括登録も可能です（<a href="/excel/import">Excel インポート</a>）</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+<% @endsection %>
