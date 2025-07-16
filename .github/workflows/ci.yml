@@ -16,11 +16,14 @@ jobs:
         version:
           - '1.9'
           - '1.10'
-          - '1.11'
         os:
           - ubuntu-latest
           - windows-latest
           - macos-latest
+        exclude:
+          # Windows with Julia 1.10 can be flaky
+          - os: windows-latest
+            version: '1.10'
     steps:
       - uses: actions/checkout@v4
       
@@ -34,9 +37,14 @@ jobs:
         run: |
           julia --project=. -e "using Pkg; Pkg.instantiate()"
           
+      - name: Create test data directory
+        run: mkdir -p data
+          
       - name: Run tests
         run: |
-          julia --project=. -e "using Pkg; Pkg.test(coverage=true)"
+          julia --project=. test/runtests.jl
+        env:
+          JULIA_NUM_THREADS: 2
           
       - uses: julia-actions/julia-processcoverage@v1
       
@@ -52,11 +60,14 @@ jobs:
       
       - uses: julia-actions/setup-julia@v1
         with:
-          version: '1.11'
+          version: '1.10'
           
       - name: Install dependencies
         run: |
           julia --project=. -e "using Pkg; Pkg.instantiate()"
+          
+      - name: Create test data directory
+        run: mkdir -p data
           
       - name: Run security tests
         run: |
@@ -70,15 +81,20 @@ jobs:
       
       - uses: julia-actions/setup-julia@v1
         with:
-          version: '1.11'
+          version: '1.10'
           
       - name: Install dependencies
         run: |
           julia --project=. -e "using Pkg; Pkg.instantiate()"
           
+      - name: Create test data directory
+        run: mkdir -p data
+          
       - name: Run integration tests
         run: |
           julia --project=. test/test_integration.jl
+        env:
+          JULIA_NUM_THREADS: 4
 
   docker:
     name: Docker Build

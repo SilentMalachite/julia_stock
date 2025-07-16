@@ -1,0 +1,141 @@
+name: Performance Tests
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  schedule:
+    - cron: '0 2 * * 0' # 毎週日曜日の午前2時
+
+jobs:
+  benchmark:
+    name: Run Benchmarks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: julia-actions/setup-julia@v1
+        with:
+          version: '1.10'
+          
+      - uses: julia-actions/cache@v1
+      
+      - name: Install dependencies
+        run: |
+          julia --project=. -e "using Pkg; Pkg.instantiate()"
+          julia --project=. -e "using Pkg; Pkg.add(\"BenchmarkTools\")"
+          
+      - name: Create test data directory
+        run: mkdir -p data
+        
+      - name: Create benchmark script
+        run: |
+          cat > benchmark.jl << 'EOF'
+          using BenchmarkTools
+          using Dates
+          
+          include("src/InventorySystem.jl")
+          using .InventorySystem
+          
+          # データベース初期化
+          InventorySystem.DuckDBConnection.initialize_database("data/benchmark.duckdb")
+          
+          # ベンチマーク実行
+          println("=== Julia在庫管理システム ベンチマーク ===")
+          println("実行日時: ", now())
+          println()
+          
+          # 1. 在庫作成のベンチマーク
+          create_bench = @benchmark begin
+              stock_data = Dict(
+                  "product_code" => "BENCH$(rand(1000:9999))",
+                  "product_name" => "ベンチマーク商品",
+                  "category" => "テスト",
+                  "quantity" => rand(1:1000),
+                  "unit" => "個",
+                  "price" => rand(100:10000)
+              )
+              InventorySystem.StockModel.create(stock_data)
+          end samples=100
+          
+          println("1. 在庫作成:")
+          println("  平均時間: ", mean(create_bench.times) / 1e6, " ms")
+          println("  最小時間: ", minimum(create_bench.times) / 1e6, " ms")
+          println("  最大時間: ", maximum(create_bench.times) / 1e6, " ms")
+          println()
+          
+          # 2. 全件取得のベンチマーク
+          # まず1000件のデータを作成
+          for i in 1:1000
+              stock_data = Dict(
+                  "product_code" => "LOAD$(lpad(i, 4, '0'))",
+                  "product_name" => "負荷テスト商品$i",
+                  "category" => "負荷テスト",
+                  "quantity" => rand(1:1000),
+                  "unit" => "個",
+                  "price" => rand(100:10000)
+              )
+              InventorySystem.StockModel.create(stock_data)
+          end
+          
+          all_bench = @benchmark begin
+              InventorySystem.StockModel.all()
+          end samples=50
+          
+          println("2. 全件取得 (1000件):")
+          println("  平均時間: ", mean(all_bench.times) / 1e6, " ms")
+          println("  最小時間: ", minimum(all_bench.times) / 1e6, " ms")
+          println("  最大時間: ", maximum(all_bench.times) / 1e6, " ms")
+          println()
+          
+          # 3. カテゴリ検索のベンチマーク
+          category_bench = @benchmark begin
+              InventorySystem.StockModel.find_by_category("負荷テスト")
+          end samples=50
+          
+          println("3. カテゴリ検索:")
+          println("  平均時間: ", mean(category_bench.times) / 1e6, " ms")
+          println("  最小時間: ", minimum(category_bench.times) / 1e6, " ms")
+          println("  最大時間: ", maximum(category_bench.times) / 1e6, " ms")
+          println()
+          
+          # 4. Excel エクスポートのベンチマーク
+          export_bench = @benchmark begin
+              InventorySystem.ExcelHandler.export_to_excel("benchmark_export.xlsx")
+          end samples=10
+          
+          println("4. Excel エクスポート (1000件):")
+          println("  平均時間: ", mean(export_bench.times) / 1e6, " ms")
+          println("  最小時間: ", minimum(export_bench.times) / 1e6, " ms")
+          println("  最大時間: ", maximum(export_bench.times) / 1e6, " ms")
+          
+          # クリーンアップ
+          rm("data/benchmark.duckdb", force=true)
+          rm("benchmark_export.xlsx", force=true)
+          EOF
+          
+      - name: Run benchmarks
+        run: |
+          julia --project=. benchmark.jl | tee benchmark_results.txt
+          
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results-${{ github.sha }}
+          path: benchmark_results.txt
+          
+      - name: Comment PR with results
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const results = fs.readFileSync('benchmark_results.txt', 'utf8');
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '## パフォーマンステスト結果\n\n```\n' + results + '\n```'
+            });

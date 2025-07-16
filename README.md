@@ -1,5 +1,8 @@
 # Julia在庫管理システム
 
+[![CI](https://github.com/SilentMalachite/julia_stock/actions/workflows/ci.yml/badge.svg)](https://github.com/SilentMalachite/julia_stock/actions/workflows/ci.yml)
+[![Deploy](https://github.com/SilentMalachite/julia_stock/actions/workflows/deploy.yml/badge.svg)](https://github.com/SilentMalachite/julia_stock/actions/workflows/deploy.yml)
+[![CodeQL](https://github.com/SilentMalachite/julia_stock/actions/workflows/codeql.yml/badge.svg)](https://github.com/SilentMalachite/julia_stock/actions/workflows/codeql.yml)
 [![Julia](https://img.shields.io/badge/Julia-1.9+-9558B2?style=flat&logo=julia&logoColor=white)](https://julialang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![DuckDB](https://img.shields.io/badge/DuckDB-0.9+-FFF000?style=flat&logo=duckdb&logoColor=black)](https://duckdb.org/)
