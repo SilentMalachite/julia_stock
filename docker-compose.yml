@@ -1,0 +1,196 @@
+version: '3.8'
+
+services:
+  # メイン在庫管理システム
+  inventory-system:
+    build: .
+    container_name: julia-inventory-system
+    ports:
+      - "8000:8000"
+    environment:
+      - INVENTORY_PORT=8000
+      - INVENTORY_ENV=production
+      - JWT_SECRET=${JWT_SECRET:-your-super-secret-jwt-key-change-this-in-production}
+      - JWT_EXPIRY=${JWT_EXPIRY:-86400}
+      - DB_PATH=/app/data/inventory.db
+      - AUTH_DB_PATH=/app/data/auth.db
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - LOG_MAX_FILE_SIZE=${LOG_MAX_FILE_SIZE:-10485760}
+      - LOG_MAX_FILES=${LOG_MAX_FILES:-5}
+      - MAX_LOGIN_ATTEMPTS=${MAX_LOGIN_ATTEMPTS:-5}
+      - ACCOUNT_LOCK_DURATION=${ACCOUNT_LOCK_DURATION:-3600}
+      - PASSWORD_MIN_LENGTH=${PASSWORD_MIN_LENGTH:-8}
+      - DB_POOL_MAX_CONNECTIONS=${DB_POOL_MAX_CONNECTIONS:-20}
+      - DB_POOL_MIN_CONNECTIONS=${DB_POOL_MIN_CONNECTIONS:-5}
+      - DB_CONNECTION_TIMEOUT=${DB_CONNECTION_TIMEOUT:-30}
+    volumes:
+      - inventory_data:/app/data
+      - inventory_logs:/app/logs
+      - inventory_backups:/app/backups
+      - ./config:/app/config:ro  # 設定ファイル（読み取り専用）
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/healthcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - inventory_network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.inventory.rule=Host(`inventory.localhost`)"
+      - "traefik.http.services.inventory.loadbalancer.server.port=8000"
+
+  # バックアップサービス（オプション）
+  backup-service:
+    image: alpine:3.18
+    container_name: inventory-backup
+    volumes:
+      - inventory_data:/data:ro
+      - inventory_backups:/backups
+      - ./scripts/backup.sh:/backup.sh:ro
+    environment:
+      - BACKUP_SCHEDULE=${BACKUP_SCHEDULE:-0 2 * * *}  # 毎日午前2時
+      - BACKUP_RETENTION_DAYS=${BACKUP_RETENTION_DAYS:-30}
+    command: >
+      sh -c "
+        apk add --no-cache dcron &&
+        echo '$${BACKUP_SCHEDULE} /backup.sh' | crontab - &&
+        crond -f
+      "
+    restart: unless-stopped
+    depends_on:
+      - inventory-system
+    networks:
+      - inventory_network
+
+  # リバースプロキシ（オプション）
+  traefik:
+    image: traefik:v3.0
+    container_name: inventory-traefik
+    command:
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--certificatesresolvers.letsencrypt.acme.email=admin@example.com"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/acme.json"
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080"  # Traefikダッシュボード
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - traefik_acme:/acme.json
+    restart: unless-stopped
+    networks:
+      - inventory_network
+    profiles:
+      - reverse-proxy
+
+  # 監視システム（オプション）
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: inventory-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    restart: unless-stopped
+    networks:
+      - inventory_network
+    profiles:
+      - monitoring
+
+  # メトリクス可視化（オプション）
+  grafana:
+    image: grafana/grafana:latest
+    container_name: inventory-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+    networks:
+      - inventory_network
+    profiles:
+      - monitoring
+
+volumes:
+  inventory_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${DATA_PATH:-./volumes/data}
+  
+  inventory_logs:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${LOGS_PATH:-./volumes/logs}
+  
+  inventory_backups:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${BACKUPS_PATH:-./volumes/backups}
+  
+  traefik_acme:
+    driver: local
+  
+  prometheus_data:
+    driver: local
+  
+  grafana_data:
+    driver: local
+
+networks:
+  inventory_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+# 使用例:
+#
+# 基本的な起動:
+# docker-compose up -d
+#
+# リバースプロキシ付きで起動:
+# docker-compose --profile reverse-proxy up -d
+#
+# 監視システム付きで起動:
+# docker-compose --profile monitoring up -d
+#
+# 全機能付きで起動:
+# docker-compose --profile reverse-proxy --profile monitoring up -d
+#
+# 環境変数ファイル(.env)を使用:
+# JWT_SECRET=your-production-secret
+# LOG_LEVEL=WARN
+# BACKUP_SCHEDULE=0 1 * * *
+# GRAFANA_PASSWORD=secure-password
+# DATA_PATH=/opt/inventory/data
+# LOGS_PATH=/opt/inventory/logs
+# BACKUPS_PATH=/opt/inventory/backups
