@@ -18,7 +18,6 @@ using ..ExcelHandler
 
 # ルートファイルをインクルード
 include("routes.jl")
-
 # グローバル変数でサーバー情報を管理
 const RUNNING_SERVERS = Set{Int}()
 
@@ -467,7 +466,6 @@ function setup_routes()
             return JSON3.write(Dict("error" => "内部サーバーエラー")), 500
         end
     end
-    
 end
 
 end
