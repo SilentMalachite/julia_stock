@@ -42,7 +42,7 @@ jobs:
           
       - name: Run tests
         run: |
-          julia --project=. test/runtests.jl
+          julia --project=. test/ci_test.jl
         env:
           JULIA_NUM_THREADS: 2
           
@@ -71,7 +71,7 @@ jobs:
           
       - name: Run security tests
         run: |
-          julia --project=. test/test_security.jl
+          julia --project=. test/ci_test.jl
 
   integration:
     name: Integration Tests
@@ -92,7 +92,7 @@ jobs:
           
       - name: Run integration tests
         run: |
-          julia --project=. test/test_integration.jl
+          julia --project=. test/ci_test.jl
         env:
           JULIA_NUM_THREADS: 4
 

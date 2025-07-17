@@ -1,5 +1,5 @@
 # Julia在庫管理システム - Docker Image
-FROM julia:1.11-slim
+FROM julia:1.10-slim
 
 # メタデータ
 LABEL maintainer="Julia在庫管理システム開発チーム"

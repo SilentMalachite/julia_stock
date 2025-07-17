@@ -466,6 +466,6 @@ function setup_routes()
             return JSON3.write(Dict("error" => "内部サーバーエラー")), 500
         end
     end
-end
+end # setup_routes
 
 end # module
