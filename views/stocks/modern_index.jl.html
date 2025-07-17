@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>在庫管理システム - 在庫一覧</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="/css/modern-ui.css">
+</head>
+<body>
+    <!-- ナビゲーションバー -->
+    <nav class="navbar navbar-expand-lg navbar-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="/">
+                <i class="fas fa-warehouse"></i>
+                在庫管理システム
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/stocks">
+                            <i class="fas fa-boxes"></i> 在庫一覧
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/reports">
+                            <i class="fas fa-chart-bar"></i> レポート
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/settings">
+                            <i class="fas fa-cog"></i> 設定
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- メインコンテンツ -->
+    <div class="container-fluid mt-4">
+        <!-- 統計カード -->
+        <div class="row mb-4">
+            <div class="col-md-3 col-sm-6 mb-3">
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                        <i class="fas fa-boxes"></i>
+                    </div>
+                    <div class="stat-value" id="totalItems">0</div>
+                    <div class="stat-label">総アイテム数</div>
+                </div>
+            </div>
+            <div class="col-md-3 col-sm-6 mb-3">
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+                        <i class="fas fa-yen-sign"></i>
+                    </div>
+                    <div class="stat-value" id="totalValue">¥0</div>
+                    <div class="stat-label">在庫総額</div>
+                </div>
+            </div>
+            <div class="col-md-3 col-sm-6 mb-3">
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);">
+                        <i class="fas fa-exclamation-triangle"></i>
+                    </div>
+                    <div class="stat-value" id="lowStockItems">0</div>
+                    <div class="stat-label">低在庫アイテム</div>
+                </div>
+            </div>
+            <div class="col-md-3 col-sm-6 mb-3">
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);">
+                        <i class="fas fa-times-circle"></i>
+                    </div>
+                    <div class="stat-value" id="outOfStockItems">0</div>
+                    <div class="stat-label">在庫切れ</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 検索・フィルターセクション -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <div class="search-box">
+                            <i class="fas fa-search"></i>
+                            <input type="text" id="searchInput" class="form-control" placeholder="商品名・商品コードで検索...">
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <select id="categoryFilter" class="form-select">
+                            <option value="">全カテゴリ</option>
+                            <option value="電子部品">電子部品</option>
+                            <option value="機械部品">機械部品</option>
+                            <option value="消耗品">消耗品</option>
+                            <option value="工具">工具</option>
+                            <option value="その他">その他</option>
+                        </select>
+                    </div>
+                    <div class="col-md-5 text-md-end">
+                        <button id="importExcelBtn" class="btn btn-info">
+                            <i class="fas fa-file-import"></i> インポート
+                        </button>
+                        <button id="exportExcelBtn" class="btn btn-success">
+                            <i class="fas fa-file-export"></i> エクスポート
+                        </button>
+                        <button id="addStockBtn" class="btn btn-primary">
+                            <i class="fas fa-plus"></i> 新規登録
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 在庫テーブル -->
+        <div class="table-container">
+            <table class="table table-hover" id="stocksTable">
+                <thead>
+                    <tr>
+                        <th data-sortable data-field="product_code">商品コード</th>
+                        <th data-sortable data-field="product_name">商品名</th>
+                        <th data-sortable data-field="category">カテゴリ</th>
+                        <th data-sortable data-field="quantity" class="text-end">在庫数</th>
+                        <th data-sortable data-field="price" class="text-end">単価</th>
+                        <th data-sortable data-field="location">保管場所</th>
+                        <th data-sortable data-field="updated_at">更新日時</th>
+                        <th class="text-center">操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- データはJavaScriptで動的に挿入 -->
+                </tbody>
+            </table>
+        </div>
+
+        <!-- ページネーション -->
+        <nav aria-label="Page navigation" class="mt-4">
+            <ul class="pagination justify-content-center" id="pagination">
+                <!-- ページネーションはJavaScriptで動的に生成 -->
+            </ul>
+        </nav>
+    </div>
+
+    <!-- 在庫追加・編集モーダル -->
+    <div class="modal fade" id="stockModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="modalTitle">新規在庫登録</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form id="stockForm">
+                    <div class="modal-body">
+                        <input type="hidden" id="stockId" name="stockId">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label for="productCode" class="form-label">商品コード <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="productCode" name="productCode" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="productName" class="form-label">商品名 <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="productName" name="productName" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="category" class="form-label">カテゴリ <span class="text-danger">*</span></label>
+                                <select class="form-select" id="category" name="category" required>
+                                    <option value="">選択してください</option>
+                                    <option value="電子部品">電子部品</option>
+                                    <option value="機械部品">機械部品</option>
+                                    <option value="消耗品">消耗品</option>
+                                    <option value="工具">工具</option>
+                                    <option value="その他">その他</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label for="quantity" class="form-label">在庫数 <span class="text-danger">*</span></label>
+                                <input type="number" class="form-control" id="quantity" name="quantity" min="0" required>
+                            </div>
+                            <div class="col-md-3">
+                                <label for="unit" class="form-label">単位 <span class="text-danger">*</span></label>
+                                <select class="form-select" id="unit" name="unit" required>
+                                    <option value="個">個</option>
+                                    <option value="箱">箱</option>
+                                    <option value="セット">セット</option>
+                                    <option value="kg">kg</option>
+                                    <option value="m">m</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="price" class="form-label">単価 <span class="text-danger">*</span></label>
+                                <div class="input-group">
+                                    <span class="input-group-text">¥</span>
+                                    <input type="number" class="form-control" id="price" name="price" min="0" step="0.01" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="location" class="form-label">保管場所</label>
+                                <input type="text" class="form-control" id="location" name="location">
+                            </div>
+                            <div class="col-12">
+                                <label for="description" class="form-label">備考</label>
+                                <textarea class="form-control" id="description" name="description" rows="3"></textarea>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i> 保存
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Excelインポートモーダル -->
+    <div class="modal fade" id="importModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Excelファイルのインポート</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="excelFile" class="form-label">Excelファイルを選択</label>
+                        <input type="file" class="form-control" id="excelFile" accept=".xlsx,.xls">
+                    </div>
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i>
+                        フォーマット: 商品コード、商品名、カテゴリ、在庫数、単位、単価、保管場所の順で記載してください。
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
+                    <button type="button" class="btn btn-primary" id="importSubmitBtn">
+                        <i class="fas fa-upload"></i> インポート
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ローディングスピナー -->
+    <div id="loadingSpinner" class="spinner-container" style="display: none;">
+        <div class="spinner"></div>
+    </div>
+
+    <!-- トースト通知コンテナ -->
+    <div id="toastContainer" class="toast-container"></div>
+
+    <!-- フローティングアクションボタン -->
+    <button class="fab" id="fabBtn">
+        <i class="fas fa-plus"></i>
+    </button>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Custom JS -->
+    <script src="/js/modern-app.js"></script>
+</body>
+</html>

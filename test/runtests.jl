@@ -54,6 +54,14 @@ using .InventorySystem
     @testset "Backup Tests" begin
         include("test_backup.jl")
     end
+    
+    @testset "Modern GUI Tests" begin
+        include("test_frontend_gui.jl")
+    end
+    
+    @testset "Modern API Tests" begin
+        include("test_modern_api.jl")
+    end
 end
 
 println("全てのテストが完了しました。")
