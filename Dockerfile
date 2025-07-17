@@ -36,8 +36,11 @@ RUN julia --project=. -e "using Pkg; Pkg.instantiate(); Pkg.precompile()"
 
 # アプリケーションファイルをコピー
 COPY --chown=inventory:inventory src/ ./src/
+COPY --chown=inventory:inventory public/ ./public/
+COPY --chown=inventory:inventory views/ ./views/
 COPY --chown=inventory:inventory docs/ ./docs/
 COPY --chown=inventory:inventory test/ ./test/
+COPY --chown=inventory:inventory scripts/ ./scripts/
 COPY --chown=inventory:inventory *.md ./
 
 # ヘルスチェック用スクリプトを作成
