@@ -1,8 +1,8 @@
 # Julia在庫管理システム
 
-[![CI](https://github.com/SilentMalachite/julia_stock/actions/workflows/ci.yml/badge.svg)](https://github.com/SilentMalachite/julia_stock/actions/workflows/ci.yml)
-[![Deploy](https://github.com/SilentMalachite/julia_stock/actions/workflows/deploy.yml/badge.svg)](https://github.com/SilentMalachite/julia_stock/actions/workflows/deploy.yml)
-[![CodeQL](https://github.com/SilentMalachite/julia_stock/actions/workflows/codeql.yml/badge.svg)](https://github.com/SilentMalachite/julia_stock/actions/workflows/codeql.yml)
+[![CI](https://github.com/SilentMalachite/julia_stock/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/SilentMalachite/julia_stock/actions/workflows/ci.yml)
+[![Deploy](https://github.com/SilentMalachite/julia_stock/actions/workflows/deploy.yml/badge.svg?branch=main)](https://github.com/SilentMalachite/julia_stock/actions/workflows/deploy.yml)
+[![CodeQL](https://github.com/SilentMalachite/julia_stock/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/SilentMalachite/julia_stock/actions/workflows/codeql.yml)
 [![Julia](https://img.shields.io/badge/Julia-1.9+-9558B2?style=flat&logo=julia&logoColor=white)](https://julialang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![DuckDB](https://img.shields.io/badge/DuckDB-0.9+-FFF000?style=flat&logo=duckdb&logoColor=black)](https://duckdb.org/)
@@ -21,7 +21,6 @@
 
 詳細は[モダンGUIガイド](docs/MODERN_GUI_GUIDE.md)をご覧ください。
 
-![システム概要](docs/assets/system-overview.png)
 
 ## ✨ 主な機能
 
@@ -302,18 +301,12 @@ GitHub Actions により自動実行：
 
 ### API リファレンス
 - **[API仕様書](docs/API_SPECIFICATION.md)** - REST API の完全仕様
-- **[認証ガイド](docs/auth-guide.md)** - JWT認証の使用方法
-- **[エラーコード](docs/error-codes.md)** - エラー対応ガイド
 
 ### 運用ガイド
 - **[運用マニュアル](docs/OPERATIONS_MANUAL.md)** - システム運用の包括的ガイド
-- **[バックアップ手順](docs/backup-procedures.md)** - データ保護戦略
-- **[トラブルシューティング](docs/troubleshooting.md)** - 問題解決ガイド
 
 ### 開発者向け
-- **[開発ガイド](docs/development-guide.md)** - コントリビューション方法
-- **[アーキテクチャ](docs/architecture.md)** - システム設計詳細
-- **[デプロイガイド](docs/deployment.md)** - 本番環境構築
+- **[モダンGUIガイド](docs/MODERN_GUI_GUIDE.md)** - モダンなユーザーインターフェースの使い方
 
 ## 🤝 コントリビューション
 
@@ -337,7 +330,6 @@ git config core.hooksPath .githooks
 4. **コードフォーマット** を適用
 5. **Pull Request** を作成
 
-詳細は [CONTRIBUTING.md](CONTRIBUTING.md) をご覧ください。
 
 ## 📄 ライセンス
 
