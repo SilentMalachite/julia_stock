@@ -48,8 +48,14 @@ export User, Session, AuthResult,
 # データベース接続（グローバル）
 const AUTH_DB = Ref{Union{DuckDB.DB, Nothing}}(nothing)
 
-# JWT秘密鍵（本番環境では環境変数から取得すべき）
-const JWT_SECRET = "your-super-secret-jwt-key-change-this-in-production"
+# JWT秘密鍵は環境変数から取得
+function get_jwt_secret()::String
+    secret = get(ENV, "JWT_SECRET", "")
+    if isempty(secret) || length(secret) < 16
+        error("JWT_SECRET が未設定、または短すぎます（16文字以上を推奨）")
+    end
+    return secret
+end
 
 # 権限定義
 const PERMISSIONS = Dict(
@@ -71,6 +77,11 @@ function init_auth_database(db_path::String = "data/auth.db")
     認証データベースを初期化
     """
     try
+        # ディレクトリが無ければ作成
+        try
+            mkpath(dirname(db_path))
+        catch
+        end
         AUTH_DB[] = DuckDB.DB(db_path)
         create_auth_tables()
         println("認証データベースが初期化されました")
@@ -131,6 +142,26 @@ function create_auth_tables()
     DuckDB.execute(AUTH_DB[], reset_token_sql)
 end
 
+function password_hash_iterations()::Int
+    val = get(ENV, "PASSWORD_HASH_ITERATIONS", "10000")
+    try
+        iters = parse(Int, val)
+        return max(iters, 1000) # 下限
+    catch
+        return 10000
+    end
+end
+
+function stretch_sha256(password::String, salt_hex::String, iterations::Int)::Vector{UInt8}
+    # シンプルなストレッチング（擬似PBKDF）
+    data = Vector{UInt8}(password * salt_hex)
+    digest = sha256(data)
+    for _ in 2:iterations
+        digest = sha256(vcat(digest, data))
+    end
+    return digest
+end
+
 function hash_password(password::String)::String
     """
     パスワードをハッシュ化（ソルト付き）
@@ -144,15 +175,11 @@ function hash_password(password::String)::String
         throw(ArgumentError("パスワードは大文字・小文字・数字・特殊文字を含む必要があります"))
     end
     
-    # ランダムソルト生成
+    # ランダムソルト + ストレッチング
     salt = bytes2hex(rand(UInt8, 16))
-    
-    # パスワード + ソルトをハッシュ化
-    hash_input = password * salt
-    hash_bytes = sha256(hash_input)
-    hash_hex = bytes2hex(hash_bytes)
-    
-    return salt * ":" * hash_hex
+    iters = password_hash_iterations()
+    digest = stretch_sha256(password, salt, iters)
+    return join(["s2", string(iters), salt, bytes2hex(digest)], ":")
 end
 
 function verify_password(password::String, hash::String)::Bool
@@ -161,19 +188,23 @@ function verify_password(password::String, hash::String)::Bool
     """
     try
         parts = split(hash, ":")
-        if length(parts) != 2
+        if length(parts) == 4 && parts[1] == "s2"
+            # 新フォーマット: s2:iter:salt:hex
+            iters = parse(Int, parts[2])
+            salt = parts[3]
+            stored_hex = parts[4]
+            calc = stretch_sha256(password, salt, iters)
+            return secure_compare(hex_to_bytes(stored_hex), calc)
+        elseif length(parts) == 2
+            # 旧フォーマット: salt:hex（後方互換）
+            salt = parts[1]
+            stored = parts[2]
+            hash_input = password * salt
+            calc_hex = bytes2hex(sha256(hash_input))
+            return constant_time_str_eq(calc_hex, stored)
+        else
             return false
         end
-        
-        salt = parts[1]
-        stored_hash = parts[2]
-        
-        # 入力パスワードを同じ方法でハッシュ化
-        hash_input = password * salt
-        hash_bytes = sha256(hash_input)
-        hash_hex = bytes2hex(hash_bytes)
-        
-        return hash_hex == stored_hash
     catch
         return false
     end
@@ -373,6 +404,55 @@ function authenticate_user(username::String, password::String)::Union{AuthResult
     return AuthResult(user.username, user.role, token, expires_at)
 end
 
+function b64url_encode(bytes::Vector{UInt8})::String
+    s = base64encode(bytes)
+    s = replace(s, "+" => "-", "/" => "_")
+    replace(s, "=" => "")
+end
+
+function b64url_decode(s::String)::Vector{UInt8}
+    t = replace(s, "-" => "+", "_" => "/")
+    pad = (4 - (length(t) % 4)) % 4
+    t *= repeat("=", pad)
+    base64decode(t)
+end
+
+function constant_time_str_eq(a::String, b::String)::Bool
+    if ncodeunits(a) != ncodeunits(b)
+        return false
+    end
+    diff = 0
+    @inbounds for i in 1:ncodeunits(a)
+        diff |= Int(codeunit(a, i)) ⊻ Int(codeunit(b, i))
+    end
+    return diff == 0
+end
+
+function hex_to_bytes(hex::String)::Vector{UInt8}
+    n = length(hex)
+    if isodd(n)
+        error("invalid hex length")
+    end
+    out = Vector{UInt8}(undef, n >>> 1)
+    j = 1
+    @inbounds for i in 1:2:n
+        out[j] = parse(UInt8, hex[i:i+1], base=16)
+        j += 1
+    end
+    return out
+end
+
+function secure_compare(a::Vector{UInt8}, b::Vector{UInt8})::Bool
+    if length(a) != length(b)
+        return false
+    end
+    diff = UInt8(0)
+    @inbounds for i in eachindex(a, b)
+        diff |= a[i] ⊻ b[i]
+    end
+    return diff == 0x00
+end
+
 function generate_jwt_token(user::User; expires_in::Int = 86400)::String
     """
     JWTトークンを生成（簡易版）
@@ -380,7 +460,7 @@ function generate_jwt_token(user::User; expires_in::Int = 86400)::String
     # ヘッダー
     header = Dict("alg" => "HS256", "typ" => "JWT")
     header_json = JSON3.write(header)
-    header_b64 = base64encode(header_json)
+    header_b64 = b64url_encode(Vector{UInt8}(header_json))
     
     # ペイロード
     exp_time = now() + Second(expires_in)
@@ -392,12 +472,12 @@ function generate_jwt_token(user::User; expires_in::Int = 86400)::String
         "iat" => datetime2unix(now())
     )
     payload_json = JSON3.write(payload)
-    payload_b64 = base64encode(payload_json)
+    payload_b64 = b64url_encode(Vector{UInt8}(payload_json))
     
     # 署名
     message = header_b64 * "." * payload_b64
-    signature = bytes2hex(hmac_sha256(JWT_SECRET, message))
-    signature_b64 = base64encode(signature)
+    signature = hmac_sha256(get_jwt_secret(), message)
+    signature_b64 = b64url_encode(signature)
     
     return header_b64 * "." * payload_b64 * "." * signature_b64
 end
@@ -411,30 +491,26 @@ function verify_jwt_token(token::String)::Union{User, Nothing}
         if length(parts) != 3
             return nothing
         end
-        
+
         header_b64, payload_b64, signature_b64 = parts
-        
-        # 署名検証
+        # 署名検証（Base64URL）
         message = header_b64 * "." * payload_b64
-        expected_signature = bytes2hex(hmac_sha256(JWT_SECRET, message))
-        expected_signature_b64 = base64encode(expected_signature)
-        
-        if signature_b64 != expected_signature_b64
+        expected_sig = hmac_sha256(get_jwt_secret(), message)
+        given_sig = b64url_decode(signature_b64)
+        if !secure_compare(expected_sig, given_sig)
             return nothing
         end
-        
+
         # ペイロード解析
-        payload_json = String(base64decode(payload_b64))
+        payload_json = String(b64url_decode(payload_b64))
         payload = JSON3.read(payload_json)
-        
+
         # 期限チェック
         if payload.exp < datetime2unix(now())
             return nothing
         end
-        
-        # ユーザー取得
+
         return get_user_by_username(payload.username)
-        
     catch
         return nothing
     end
@@ -655,10 +731,9 @@ function change_password(username::String, old_password::String, new_password::S
         throw(ArgumentError("認証データベースが初期化されていません"))
     end
     
-    # まず現在のパスワードで認証
-    try
-        authenticate_user(username, old_password)
-    catch
+    # 現在のパスワード検証（認証APIは例外を投げないため明示検証）
+    user = get_user_by_username(username)
+    if user === nothing || !verify_password(old_password, user.password_hash)
         throw(ArgumentError("現在のパスワードが正しくありません"))
     end
     

@@ -21,8 +21,6 @@
 
 詳細は[モダンGUIガイド](docs/MODERN_GUI_GUIDE.md)をご覧ください。
 
-![システム概要](docs/assets/system-overview.png)
-
 ## ✨ 主な機能
 
 ### 🚀 高性能・高信頼性
@@ -32,18 +30,18 @@
 - **トランザクション** による データ整合性保証
 
 ### 🔐 エンタープライズレベルのセキュリティ
-- **JWT認証** によるセキュアなAPI アクセス
+- **JWT認証** によるセキュアなAPIアクセス
 - **ロールベース** アクセス制御（管理者/マネージャー/ユーザー）
-- **SQLインジェクション** 完全対策
+- **ストレッチング付きハッシュ（SHA-256）** によるパスワード保護
+- **SQLインジェクション対策**（パラメータ化クエリ）
 - **セキュリティ監査ログ** による不正アクセス検知
-- **アカウントロック** による ブルートフォース攻撃対策
+- **アカウントロック** によるブルートフォース攻撃対策
 
 ### 🌐 RESTful Web API
-- **OpenAPI 3.0** 準拠の設計
 - **JSON** ベースの統一インターフェース
 - **CORS** 対応によるクロスオリジンアクセス
-- **レート制限** による負荷制御
-- **多言語SDK** サポート（Julia, Python, JavaScript）
+- **レート制限** による負荷制御（ログインと更新系に適用）
+- **v2 エンドポイント** でページネーション・統計・一括更新を提供
 
 ### 📊 Excel連携
 - **完全な読み書き** 対応（.xlsx形式）
@@ -92,7 +90,7 @@
 
 ```bash
 # リポジトリをクローン
-git clone https://github.com/your-org/julia_stock.git
+git clone https://github.com/SilentMalachite/julia_stock.git
 cd julia_stock
 
 # 依存関係をインストール
@@ -103,6 +101,12 @@ mkdir -p data logs backups
 ```
 
 ### 起動
+
+事前に環境変数 `JWT_SECRET` を設定してください（必須。16文字以上の強力な秘密鍵）。
+
+```bash
+export JWT_SECRET="change-me-to-a-strong-secret"
+```
 
 ```julia
 # Juliaを起動
@@ -134,7 +138,7 @@ Webサーバーを起動中... (ポート: 8000)
 
 🔐 認証:
    - ログイン: POST /api/auth/login
-   - デフォルト管理者: admin / AdminPass123!
+   - 管理者の初期化: 環境変数 `ADMIN_DEFAULT_PASSWORD` を設定した場合のみ自動作成
 
 📖 ドキュメント: docs/API_SPECIFICATION.md
 📋 運用マニュアル: docs/OPERATIONS_MANUAL.md
@@ -142,11 +146,17 @@ Webサーバーを起動中... (ポート: 8000)
 
 ### 初回ログイン
 
+管理者アカウントは自動では作成されません。以下のいずれかで作成してください。
+
+- `ADMIN_DEFAULT_PASSWORD` を設定して起動（強度チェックあり）
+- もしくは、コンソールから `create_user("admin", "<強力なパスワード>", "admin@example.com", "admin")`
+
+作成後にログイン:
+
 ```bash
-# 管理者でログイン
 curl -X POST http://localhost:8000/api/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"username": "admin", "password": "AdminPass123!"}'
+  -d '{"username": "admin", "password": "<作成したパスワード>"}'
 ```
 
 ## 📊 使用例
@@ -177,14 +187,14 @@ finally
 end
 ```
 
-### API経由での操作
+### API経由での操作（v1）
 
 ```bash
 # 在庫一覧取得
 curl -H "Authorization: Bearer YOUR_TOKEN" \
   http://localhost:8000/api/stocks
 
-# 在庫追加
+# 在庫追加（v1）
 curl -X POST \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
@@ -198,6 +208,25 @@ curl -X POST \
     "location": "B-2-1"
   }' \
   http://localhost:8000/api/stocks
+
+### モダンAPI（v2）の例
+
+```bash
+# ページネーション付き一覧
+curl -H "Authorization: Bearer YOUR_TOKEN" \
+  "http://localhost:8000/api/v2/stocks?page=1&limit=20&search=&category=&sortBy=updated_at&sortOrder=desc"
+
+# 一括更新
+curl -X POST \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"ids":[1,2,3],"updates":{"category":"新カテゴリ"}}' \
+  http://localhost:8000/api/v2/stocks/bulk-update
+
+# 詳細統計
+curl -H "Authorization: Bearer YOUR_TOKEN" \
+  http://localhost:8000/api/v2/stocks/statistics
+```
 ```
 
 ### Excel連携
@@ -233,14 +262,11 @@ end
 ### 運用セキュリティ
 
 ```julia
-# セキュリティ監査の実行
-julia> security_audit()
-
 # システム情報の確認
 julia> system_info()
 
-# ログ分析
-julia> analyze_logs("logs/security.log", 24)  # 過去24時間
+# セキュリティログの確認（例）
+julia> println(read("logs/security.log", String))
 ```
 
 ## 📈 パフォーマンス
@@ -301,19 +327,13 @@ GitHub Actions により自動実行：
 ## 📚 ドキュメント
 
 ### API リファレンス
-- **[API仕様書](docs/API_SPECIFICATION.md)** - REST API の完全仕様
-- **[認証ガイド](docs/auth-guide.md)** - JWT認証の使用方法
-- **[エラーコード](docs/error-codes.md)** - エラー対応ガイド
+- **[API仕様書](docs/API_SPECIFICATION.md)** - REST API の仕様（v1/v2対応）
 
 ### 運用ガイド
-- **[運用マニュアル](docs/OPERATIONS_MANUAL.md)** - システム運用の包括的ガイド
-- **[バックアップ手順](docs/backup-procedures.md)** - データ保護戦略
-- **[トラブルシューティング](docs/troubleshooting.md)** - 問題解決ガイド
+- **[運用マニュアル](docs/OPERATIONS_MANUAL.md)** - セットアップ・運用手順
 
-### 開発者向け
-- **[開発ガイド](docs/development-guide.md)** - コントリビューション方法
-- **[アーキテクチャ](docs/architecture.md)** - システム設計詳細
-- **[デプロイガイド](docs/deployment.md)** - 本番環境構築
+### モダンGUI
+- **[モダンGUIガイド](docs/MODERN_GUI_GUIDE.md)** - UI機能と使い方
 
 ## 🤝 コントリビューション
 
@@ -388,6 +408,6 @@ git config core.hooksPath .githooks
 
 **Julia在庫管理システム** で、あなたのビジネスを次のレベルへ 🚀
 
-[📖 ドキュメント](docs/) | [🐛 Issues](https://github.com/your-org/julia_stock/issues) | [💬 Discussions](https://github.com/your-org/julia_stock/discussions) | [🌟 Star us on GitHub](https://github.com/your-org/julia_stock)
+[📖 ドキュメント](docs/) | [🐛 Issues](https://github.com/SilentMalachite/julia_stock/issues) | [💬 Discussions](https://github.com/SilentMalachite/julia_stock/discussions) | [🌟 Star us on GitHub](https://github.com/SilentMalachite/julia_stock)
 
 </div>

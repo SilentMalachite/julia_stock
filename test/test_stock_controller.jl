@@ -7,16 +7,23 @@ using Genie
 
 include("../src/web/controllers/StockController.jl")
 include("../src/models/Stock.jl")
-include("../src/database/DuckDBConnection.jl")
+include("../src/database/ConnectionPool.jl")
+include("../src/database/SecureDuckDBConnection.jl")
 
 @testset "StockController Tests" begin
-    # テスト用のデータベース接続を設定
+    # テスト用DBを初期化
     test_db_path = "data/test_inventory.duckdb"
-    DuckDBConnection.initialize_database(test_db_path)
+    ConnectionPool.init_connection_pool(; max_connections=2, min_connections=1, database_path=test_db_path)
+    conn = ConnectionPool.get_connection_from_pool()
+    try
+        SecureDuckDBConnection.secure_create_stock_table(conn)
+    finally
+        ConnectionPool.return_connection_to_pool(conn)
+    end
     
     @testset "index - 全在庫一覧取得" begin
-        # テストデータを準備
-        Stock.create(Dict(
+        # テストデータを準備（コントローラー経由で作成）
+        _ = StockController.create(Dict(
             "product_code" => "TEST001",
             "product_name" => "テスト商品1",
             "category" => "テスト",
@@ -36,8 +43,8 @@ include("../src/database/DuckDBConnection.jl")
     end
     
     @testset "show - 特定在庫取得" begin
-        # テストデータを作成
-        stock = Stock.create(Dict(
+        # テストデータを作成（コントローラー経由）
+        resp = StockController.create(Dict(
             "product_code" => "TEST002",
             "product_name" => "テスト商品2",
             "category" => "テスト",
@@ -45,9 +52,10 @@ include("../src/database/DuckDBConnection.jl")
             "unit" => "個",
             "price" => 500
         ))
+        created = JSON3.read(String(resp.body))
         
         # コントローラーメソッドを呼び出し
-        response = StockController.show(stock.id)
+        response = StockController.show(created[:id])
         
         # レスポンスの検証
         @test response.status == 200
@@ -78,7 +86,7 @@ include("../src/database/DuckDBConnection.jl")
     
     @testset "update - 在庫更新" begin
         # テストデータを作成
-        stock = Stock.create(Dict(
+        resp = StockController.create(Dict(
             "product_code" => "TEST004",
             "product_name" => "テスト商品4",
             "category" => "テスト",
@@ -86,6 +94,7 @@ include("../src/database/DuckDBConnection.jl")
             "unit" => "個",
             "price" => 750
         ))
+        stock = JSON3.read(String(resp.body))
         
         # 更新データ
         update_data = Dict(
@@ -94,7 +103,7 @@ include("../src/database/DuckDBConnection.jl")
         )
         
         # コントローラーメソッドを呼び出し
-        response = StockController.update(stock.id, update_data)
+        response = StockController.update(stock[:id], update_data)
         
         # レスポンスの検証
         @test response.status == 200
@@ -106,7 +115,7 @@ include("../src/database/DuckDBConnection.jl")
     
     @testset "destroy - 在庫削除" begin
         # テストデータを作成
-        stock = Stock.create(Dict(
+        resp = StockController.create(Dict(
             "product_code" => "TEST005",
             "product_name" => "テスト商品5",
             "category" => "テスト",
@@ -114,17 +123,19 @@ include("../src/database/DuckDBConnection.jl")
             "unit" => "個",
             "price" => 250
         ))
+        stock = JSON3.read(String(resp.body))
         
         # コントローラーメソッドを呼び出し
-        response = StockController.destroy(stock.id)
+        response = StockController.destroy(stock[:id])
         
         # レスポンスの検証
         @test response.status == 200
         data = JSON3.read(String(response.body))
         @test data[:message] == "在庫が正常に削除されました"
         
-        # 削除確認
-        @test_throws Exception Stock.find(stock.id)
+        # 削除確認（404）
+        resp2 = StockController.show(stock[:id])
+        @test resp2.status == 404
     end
     
     @testset "エラーハンドリング" begin
@@ -139,5 +150,6 @@ include("../src/database/DuckDBConnection.jl")
     end
     
     # テスト後のクリーンアップ
+    ConnectionPool.cleanup_connection_pool()
     rm(test_db_path, force=true)
 end

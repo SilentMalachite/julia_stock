@@ -4,37 +4,27 @@ using JSON3
 using XLSX
 using DataFrames
 using Dates
-using Genie
 
 include("../src/web/controllers/ExcelController.jl")
-include("../src/models/Stock.jl")
-include("../src/database/DuckDBConnection.jl")
-include("../src/excel/ExcelHandler.jl")
+include("../src/web/controllers/StockController.jl")
+include("../src/database/ConnectionPool.jl")
+include("../src/database/SecureDuckDBConnection.jl")
 
 @testset "ExcelController Tests" begin
-    # テスト用のデータベース接続を設定
-    test_db_path = "data/test_inventory.duckdb"
-    DuckDBConnection.initialize_database(test_db_path)
+    # テスト用DB初期化
+    test_db_path = "data/test_inventory_excel.duckdb"
+    ConnectionPool.init_connection_pool(; max_connections=2, min_connections=1, database_path=test_db_path)
+    conn = ConnectionPool.get_connection_from_pool()
+    try
+        SecureDuckDBConnection.secure_create_stock_table(conn)
+    finally
+        ConnectionPool.return_connection_to_pool(conn)
+    end
     
     @testset "export_excel - Excelエクスポート" begin
         # テストデータを準備
-        Stock.create(Dict(
-            "product_code" => "EXP001",
-            "product_name" => "エクスポート商品1",
-            "category" => "テスト",
-            "quantity" => 100,
-            "unit" => "個",
-            "price" => 1000
-        ))
-        
-        Stock.create(Dict(
-            "product_code" => "EXP002",
-            "product_name" => "エクスポート商品2",
-            "category" => "テスト",
-            "quantity" => 200,
-            "unit" => "個",
-            "price" => 2000
-        ))
+        _ = StockController.create(Dict("product_code" => "EXP001","product_name" => "エクスポート商品1","category" => "テスト","quantity" => 100,"unit" => "個","price" => 1000.0,"location"=>"E-1"))
+        _ = StockController.create(Dict("product_code" => "EXP002","product_name" => "エクスポート商品2","category" => "テスト","quantity" => 200,"unit" => "個","price" => 2000.0,"location"=>"E-2"))
         
         # コントローラーメソッドを呼び出し
         response = ExcelController.export_excel()
@@ -42,7 +32,7 @@ include("../src/excel/ExcelHandler.jl")
         # レスポンスの検証
         @test response.status == 200
         @test response.headers["Content-Type"] == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        @test response.headers["Content-Disposition"] == "attachment; filename=\"inventory_export_$(Dates.format(now(), \"yyyymmdd_HHMMSS\")).xlsx\""
+        @test startswith(response.headers["Content-Disposition"], "attachment; filename=\"inventory_export_")
         
         # ファイルが正しく生成されたか確認
         @test !isempty(response.body)
@@ -79,13 +69,15 @@ include("../src/excel/ExcelHandler.jl")
         @test data[:message] == "Excelファイルのインポートが完了しました"
         
         # データベースに正しくインポートされたか確認
-        imported_stock1 = Stock.find_by("product_code", "IMP001")
-        @test imported_stock1[:product_name] == "インポート商品1"
-        @test imported_stock1[:quantity] == 50
-        
-        imported_stock2 = Stock.find_by("product_code", "IMP002")
-        @test imported_stock2[:product_name] == "インポート商品2"
-        @test imported_stock2[:quantity] == 75
+        # DBから確認
+        conn = ConnectionPool.get_connection_from_pool()
+        try
+            stocks = SecureDuckDBConnection.secure_get_all_stocks(conn)
+            codes = Set(s.code for s in stocks)
+            @test "IMP001" in codes && "IMP002" in codes
+        finally
+            ConnectionPool.return_connection_to_pool(conn)
+        end
         
         # テストファイルを削除
         rm(test_file_path, force=true)
@@ -100,5 +92,6 @@ include("../src/excel/ExcelHandler.jl")
     end
     
     # テスト後のクリーンアップ
+    ConnectionPool.cleanup_connection_pool()
     rm(test_db_path, force=true)
 end

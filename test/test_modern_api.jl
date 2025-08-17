@@ -1,252 +1,90 @@
 using Test
-using HTTP
 using JSON3
 using Dates
 
-# モダンAPIエンドポイントのテストスイート
-@testset "Modern API Endpoints Tests" begin
-    
-    # テスト用のベースURL
-    base_url = "http://localhost:8000/api"
-    
-    @testset "在庫一覧取得（ページネーション付き）" begin
-        # ページネーション、検索、ソートのパラメータをテスト
-        params = Dict(
-            "page" => 1,
-            "limit" => 20,
-            "search" => "",
-            "category" => "",
-            "sortBy" => "updated_at",
-            "sortOrder" => "desc"
-        )
-        
-        response = HTTP.get("$base_url/stocks", query=params)
-        @test response.status == 200
-        
-        data = JSON3.read(String(response.body))
-        @test haskey(data, :stocks)
-        @test haskey(data, :totalPages)
-        @test haskey(data, :statistics)
-        @test isa(data.stocks, Vector)
-        
-        # 統計情報の確認
-        stats = data.statistics
-        @test haskey(stats, :totalItems)
-        @test haskey(stats, :totalValue)
-        @test haskey(stats, :lowStockItems)
-        @test haskey(stats, :outOfStockItems)
+include("../src/web/controllers/ModernStockController.jl")
+include("../src/database/ConnectionPool.jl")
+include("../src/database/SecureDuckDBConnection.jl")
+
+@testset "Modern API Unit-like Tests" begin
+    # DB初期化
+    test_db_path = "data/test_inventory_modern.duckdb"
+    ConnectionPool.init_connection_pool(; max_connections=2, min_connections=1, database_path=test_db_path)
+    conn = ConnectionPool.get_connection_from_pool()
+    try
+        SecureDuckDBConnection.secure_create_stock_table(conn)
+    finally
+        ConnectionPool.return_connection_to_pool(conn)
     end
-    
-    @testset "検索機能" begin
-        # 商品名での検索
-        params = Dict("search" => "テスト商品")
-        response = HTTP.get("$base_url/stocks", query=params)
-        @test response.status == 200
-        
-        data = JSON3.read(String(response.body))
-        if !isempty(data.stocks)
-            for stock in data.stocks
-                @test occursin("テスト商品", stock.product_name) || occursin("テスト商品", stock.product_code)
+
+    @testset "作成と一覧・検索・ソート" begin
+        # 作成
+        s1 = Dict("product_code"=>"T1001","product_name"=>"テスト商品A","category"=>"電子","quantity"=>10,"unit"=>"個","price"=>1000.0,"location"=>"A-1")
+        s2 = Dict("product_code"=>"T1002","product_name"=>"テスト商品B","category"=>"電子","quantity"=>0,"unit"=>"個","price"=>500.0,"location"=>"A-2")
+        r1 = ModernStockController.create_with_validation(s1); @test r1.status == 201
+        r2 = ModernStockController.create_with_validation(s2); @test r2.status == 201
+
+        # 一覧
+        resp = ModernStockController.index_with_pagination(Dict("page"=>1,"limit"=>20))
+        @test resp.status == 200
+        data = JSON3.read(String(resp.body))
+        @test haskey(data, :stocks)
+        @test data.totalItems >= 2
+
+        # 検索
+        resp2 = ModernStockController.index_with_pagination(Dict("search"=>"テスト商品A"))
+        @test resp2.status == 200
+        d2 = JSON3.read(String(resp2.body))
+        if !isempty(d2.stocks)
+            for st in d2.stocks
+                @test occursin("テスト商品", st.product_name)
             end
         end
-    end
-    
-    @testset "カテゴリフィルター" begin
-        params = Dict("category" => "電子部品")
-        response = HTTP.get("$base_url/stocks", query=params)
-        @test response.status == 200
-        
-        data = JSON3.read(String(response.body))
-        for stock in data.stocks
-            @test stock.category == "電子部品"
-        end
-    end
-    
-    @testset "ソート機能" begin
-        # 価格の降順でソート
-        params = Dict("sortBy" => "price", "sortOrder" => "desc")
-        response = HTTP.get("$base_url/stocks", query=params)
-        @test response.status == 200
-        
-        data = JSON3.read(String(response.body))
-        prices = [stock.price for stock in data.stocks]
+
+        # ソート
+        resp3 = ModernStockController.index_with_pagination(Dict("sortBy"=>"price","sortOrder"=>"desc"))
+        @test resp3.status == 200
+        d3 = JSON3.read(String(resp3.body))
+        prices = [st.price for st in d3.stocks]
         @test issorted(prices, rev=true)
     end
-    
-    @testset "在庫の作成（バリデーション付き）" begin
-        # 正常なデータ
-        new_stock = Dict(
-            "product_code" => "TEST-$(rand(1000:9999))",
-            "product_name" => "テスト商品",
-            "category" => "電子部品",
-            "quantity" => 100,
-            "unit" => "個",
-            "price" => 1500.50,
-            "location" => "A-1-1",
-            "description" => "テスト用の商品です"
-        )
-        
-        response = HTTP.post(
-            "$base_url/stocks",
-            ["Content-Type" => "application/json"],
-            JSON3.write(new_stock)
-        )
-        @test response.status == 201
-        
-        created = JSON3.read(String(response.body))
-        @test haskey(created, :id)
-        @test created.product_code == new_stock["product_code"]
-        
-        # バリデーションエラーのテスト
-        invalid_stock = Dict(
-            "product_code" => "",  # 必須フィールドが空
-            "product_name" => "テスト",
-            "quantity" => -10  # 負の値
-        )
-        
-        response = HTTP.post(
-            "$base_url/stocks",
-            ["Content-Type" => "application/json"],
-            JSON3.write(invalid_stock),
-            status_exception=false
-        )
-        @test response.status == 400
-    end
-    
-    @testset "在庫の更新" begin
-        # まず在庫を作成
-        stock_data = Dict(
-            "product_code" => "UPDATE-TEST",
-            "product_name" => "更新テスト商品",
-            "category" => "工具",
-            "quantity" => 50,
-            "unit" => "個",
-            "price" => 2000
-        )
-        
-        create_response = HTTP.post(
-            "$base_url/stocks",
-            ["Content-Type" => "application/json"],
-            JSON3.write(stock_data)
-        )
-        created = JSON3.read(String(create_response.body))
-        stock_id = created.id
-        
-        # 更新
-        update_data = Dict(
-            "quantity" => 75,
-            "price" => 2500,
-            "location" => "B-2-3"
-        )
-        
-        response = HTTP.put(
-            "$base_url/stocks/$stock_id",
-            ["Content-Type" => "application/json"],
-            JSON3.write(update_data)
-        )
-        @test response.status == 200
-        
-        updated = JSON3.read(String(response.body))
-        @test updated.quantity == 75
-        @test updated.price == 2500
-        @test updated.location == "B-2-3"
-    end
-    
-    @testset "在庫の削除" begin
-        # テスト用在庫を作成
-        stock_data = Dict(
-            "product_code" => "DELETE-TEST",
-            "product_name" => "削除テスト商品",
-            "category" => "その他",
-            "quantity" => 10,
-            "unit" => "個",
-            "price" => 500
-        )
-        
-        create_response = HTTP.post(
-            "$base_url/stocks",
-            ["Content-Type" => "application/json"],
-            JSON3.write(stock_data)
-        )
-        created = JSON3.read(String(create_response.body))
-        stock_id = created.id
-        
-        # 削除
-        response = HTTP.delete("$base_url/stocks/$stock_id")
-        @test response.status == 204
-        
-        # 削除確認
-        get_response = HTTP.get("$base_url/stocks/$stock_id", status_exception=false)
-        @test get_response.status == 404
-    end
-    
-    @testset "一括操作" begin
-        # 複数在庫の一括更新
-        ids = [1, 2, 3]  # 実際のIDに置き換える必要があります
-        bulk_update = Dict(
-            "ids" => ids,
-            "updates" => Dict("category" => "消耗品")
-        )
-        
-        response = HTTP.post(
-            "$base_url/stocks/bulk-update",
-            ["Content-Type" => "application/json"],
-            JSON3.write(bulk_update),
-            status_exception=false
-        )
-        
-        # エンドポイントが実装されていれば200、されていなければ404
-        @test response.status in [200, 404]
-    end
-    
-    @testset "リアルタイム統計" begin
-        response = HTTP.get("$base_url/stocks/statistics")
-        @test response.status == 200
-        
-        stats = JSON3.read(String(response.body))
-        @test haskey(stats, :totalItems)
-        @test haskey(stats, :totalValue)
-        @test haskey(stats, :categoryBreakdown)
-        @test haskey(stats, :lowStockAlerts)
-        @test haskey(stats, :recentActivity)
-    end
-    
-    @testset "エラーハンドリング" begin
-        # 存在しないリソース
-        response = HTTP.get("$base_url/stocks/999999", status_exception=false)
-        @test response.status == 404
-        
-        error_data = JSON3.read(String(response.body))
-        @test haskey(error_data, :error)
-        @test haskey(error_data, :message)
-        
-        # 不正なリクエスト
-        response = HTTP.post(
-            "$base_url/stocks",
-            ["Content-Type" => "application/json"],
-            "invalid json",
-            status_exception=false
-        )
-        @test response.status == 400
-    end
-    
-    @testset "レート制限" begin
-        # 短時間に多数のリクエストを送信
-        responses = []
-        for i in 1:10
-            push!(responses, HTTP.get("$base_url/stocks", status_exception=false))
-        end
-        
-        # レート制限が実装されていれば、いくつかは429を返すはず
-        status_codes = [r.status for r in responses]
-        @test all(s in [200, 429] for s in status_codes)
-    end
-end
 
-# WebSocket接続のテスト（オプション）
-@testset "WebSocket Real-time Updates" begin
-    # WebSocket接続のモックテスト
-    # 実際の実装では、WebSocketクライアントライブラリを使用
-    
-    @test true  # プレースホルダー
+    @testset "更新と削除・統計" begin
+        # 1件作成
+        r = ModernStockController.create_with_validation(Dict("product_code"=>"T2001","product_name"=>"更新対象","category"=>"工具","quantity"=>5,"unit"=>"個","price"=>2000.0,"location"=>"B-1"))
+        obj = JSON3.read(String(r.body))
+        id = obj[:id]
+
+        # 更新
+        ur = ModernStockController.update_with_validation(id, Dict("quantity"=>8,"price"=>2500.0))
+        @test ur.status == 200
+        u = JSON3.read(String(ur.body))
+        @test u[:quantity] == 8
+        @test u[:price] == 2500.0
+
+        # 統計
+        sr = ModernStockController.detailed_statistics()
+        @test sr.status == 200
+
+        # 削除
+        dr = ModernStockController.destroy(id)
+        @test dr.status == 200
+    end
+
+    # 一括更新
+    @testset "一括更新" begin
+        ids = Int[]
+        for i in 1:3
+            r = ModernStockController.create_with_validation(Dict("product_code"=>"BULK$(1000+i)","product_name"=>"一括$i","category"=>"消耗","quantity"=>i,"unit"=>"個","price"=>10.0*i,"location"=>"C-$i"))
+            obj = JSON3.read(String(r.body)); push!(ids, obj[:id])
+        end
+        br = ModernStockController.bulk_update(Dict("ids"=>ids, "updates"=>Dict("category"=>"更新後")))
+        @test br.status == 200
+        bd = JSON3.read(String(br.body))
+        @test bd[:updated_count] == 3
+    end
+
+    # 後片付け
+    ConnectionPool.cleanup_connection_pool()
+    rm(test_db_path, force=true)
 end

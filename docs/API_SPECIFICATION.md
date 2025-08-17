@@ -11,7 +11,7 @@ Julia在庫管理システムのRESTful API仕様書です。このAPIは認証�
 
 ## 認証
 
-### JWT トークンの取得
+### JWT トークンの取得（ログイン）
 
 すべてのAPI エンドポイントには認証が必要です。まず認証エンドポイントでJWT トークンを取得してください。
 
@@ -47,9 +47,9 @@ Authorization: Bearer your_jwt_token_here
 
 | ロール | 権限 |
 |--------|------|
-| **admin** | 全ての操作（作成、読み取り、更新、削除、ユーザー管理） |
-| **manager** | 在庫の作成、読み取り、更新、削除、データエクスポート |
-| **user** | 在庫の読み取り、データエクスポートのみ |
+| **admin** | 全ての操作（作成、読み取り、更新、削除、ユーザー管理、インポート/エクスポート、分析閲覧） |
+| **manager** | 在庫の作成、読み取り、更新、削除、インポート/エクスポート、分析閲覧 |
+| **user** | 在庫の読み取り、エクスポートのみ |
 
 ## エラーレスポンス形式
 
@@ -65,7 +65,7 @@ Authorization: Bearer your_jwt_token_here
 
 ## API エンドポイント
 
-### 在庫管理
+### 在庫管理（v1）
 
 #### 在庫一覧取得
 
@@ -73,29 +73,24 @@ Authorization: Bearer your_jwt_token_here
 GET /api/stocks
 ```
 
-**クエリパラメータ:**
-- `category` (optional): カテゴリでフィルタリング
-- `limit` (optional): 取得件数制限（デフォルト: 1000）
-- `offset` (optional): オフセット（デフォルト: 0）
+（v1はシンプルな一覧です。カテゴリ等のフィルタは将来対応予定。）
 
 **レスポンス例:**
 ```json
-{
-  "stocks": [
-    {
-      "id": 1,
-      "name": "ノートパソコン",
-      "code": "PC001",
-      "quantity": 50,
-      "unit": "台",
-      "price": 80000.0,
-      "category": "電子機器",
-      "location": "A-1-1",
-      "created_at": "2025-07-15T09:00:00Z",
-      "updated_at": "2025-07-15T09:00:00Z"
-    }
-  ]
-}
+[
+  {
+    "id": 1,
+    "product_code": "PC001",
+    "product_name": "ノートパソコン",
+    "quantity": 50,
+    "unit": "台",
+    "price": 80000.0,
+    "category": "電子機器",
+    "location": "A-1-1",
+    "created_at": "2025-07-15T09:00:00Z",
+    "updated_at": "2025-07-15T09:00:00Z"
+  }
+]
 ```
 
 **必要な権限:** user, manager, admin
@@ -114,18 +109,16 @@ GET /api/stocks/{id}
 **レスポンス例:**
 ```json
 {
-  "stock": {
-    "id": 1,
-    "name": "ノートパソコン",
-    "code": "PC001",
-    "quantity": 50,
-    "unit": "台",
-    "price": 80000.0,
-    "category": "電子機器",
-    "location": "A-1-1",
-    "created_at": "2025-07-15T09:00:00Z",
-    "updated_at": "2025-07-15T09:00:00Z"
-  }
+  "id": 1,
+  "product_code": "PC001",
+  "product_name": "ノートパソコン",
+  "quantity": 50,
+  "unit": "台",
+  "price": 80000.0,
+  "category": "電子機器",
+  "location": "A-1-1",
+  "created_at": "2025-07-15T09:00:00Z",
+  "updated_at": "2025-07-15T09:00:00Z"
 }
 ```
 
@@ -145,8 +138,8 @@ POST /api/stocks
 **リクエストボディ:**
 ```json
 {
-  "name": "新商品",
-  "code": "NEW001",
+  "product_name": "新商品",
+  "product_code": "NEW001",
   "quantity": 100,
   "unit": "個",
   "price": 1500.0,
@@ -156,8 +149,8 @@ POST /api/stocks
 ```
 
 **バリデーション:**
-- `name`: 必須、1-255文字
-- `code`: 必須、1-50文字、ユニーク
+- `product_name`: 必須、1-255文字
+- `product_code`: 必須、1-50文字、ユニーク
 - `quantity`: 必須、0以上の整数
 - `unit`: 必須、1-20文字
 - `price`: 必須、0以上の数値
@@ -167,18 +160,17 @@ POST /api/stocks
 **レスポンス例:**
 ```json
 {
-  "stock": {
-    "id": 123,
-    "name": "新商品",
-    "code": "NEW001",
-    "quantity": 100,
-    "unit": "個",
-    "price": 1500.0,
-    "category": "新カテゴリ",
-    "location": "B-2-1",
-    "created_at": "2025-07-15T10:30:00Z",
-    "updated_at": "2025-07-15T10:30:00Z"
-  }
+  "id": 123,
+  "product_code": "NEW001",
+  "product_name": "新商品",
+  "quantity": 100,
+  "unit": "個",
+  "price": 1500.0,
+  "category": "新カテゴリ",
+  "location": "B-2-1",
+  "created_at": "2025-07-15T10:30:00Z",
+  "updated_at": "2025-07-15T10:30:00Z",
+  "message": "在庫が正常に作成されました"
 }
 ```
 
@@ -213,18 +205,16 @@ PUT /api/stocks/{id}
 **レスポンス例:**
 ```json
 {
-  "stock": {
-    "id": 1,
-    "name": "ノートパソコン",
-    "code": "PC001",
-    "quantity": 150,
-    "unit": "台",
-    "price": 1800.0,
-    "category": "電子機器",
-    "location": "B-2-2",
-    "created_at": "2025-07-15T09:00:00Z",
-    "updated_at": "2025-07-15T10:45:00Z"
-  }
+  "id": 1,
+  "product_code": "PC001",
+  "product_name": "ノートパソコン",
+  "quantity": 150,
+  "unit": "台",
+  "price": 1800.0,
+  "category": "電子機器",
+  "location": "B-2-2",
+  "updated_at": "2025-07-15T10:45:00Z",
+  "message": "在庫が正常に更新されました"
 }
 ```
 
@@ -245,7 +235,10 @@ DELETE /api/stocks/{id}
 **パスパラメータ:**
 - `id`: 在庫ID
 
-**レスポンス:** 204 No Content
+**レスポンス例:**
+```json
+{ "message": "在庫が正常に削除されました" }
+```
 
 **エラー:**
 - `404`: 在庫が見つからない
@@ -254,70 +247,62 @@ DELETE /api/stocks/{id}
 
 ---
 
-### 検索・フィルタリング
+### モダンAPI（v2）
 
-#### 在庫切れ商品取得
+#### 在庫一覧（ページネーション + 検索/ソート）
 
 ```http
-GET /api/stocks/out-of-stock
+GET /api/v2/stocks?page=1&limit=20&search=&category=&sortBy=updated_at&sortOrder=desc
 ```
 
 **レスポンス例:**
 ```json
 {
-  "stocks": [
-    {
-      "id": 3,
-      "name": "コピー用紙",
-      "code": "CP001",
-      "quantity": 0,
-      "unit": "パック",
-      "price": 300.0,
-      "category": "オフィス用品",
-      "location": "B-1-3",
-      "created_at": "2025-07-15T09:00:00Z",
-      "updated_at": "2025-07-15T09:00:00Z"
-    }
-  ]
+  "stocks": [ { "id": 1, "product_code": "PC001", "product_name": "ノートパソコン", ... } ],
+  "currentPage": 1,
+  "totalPages": 5,
+  "totalItems": 100,
+  "statistics": {
+    "totalItems": 100,
+    "totalValue": 1234567.89,
+    "outOfStockItems": 2,
+    "lowStockItems": 10,
+    "categoryBreakdown": [ {"category":"電子機器","count":50,"value":800000.0} ]
+  }
 }
 ```
 
-**必要な権限:** user, manager, admin
-
----
-
-#### 低在庫商品取得
+#### 在庫作成（バリデーション強化）
 
 ```http
-GET /api/stocks/low-stock?threshold=50
+POST /api/v2/stocks
 ```
 
-**クエリパラメータ:**
-- `threshold`: 低在庫の閾値（デフォルト: 10）
+リクエストボディは v1 と同様（`product_code`, `product_name`, `quantity` など）。
 
-**レスポンス例:**
+#### 在庫更新 / 削除
+
+```http
+PUT    /api/v2/stocks/{id}
+DELETE /api/v2/stocks/{id}
+```
+
+#### 一括更新
+
+```http
+POST /api/v2/stocks/bulk-update
+```
+
+リクエスト例:
 ```json
-{
-  "stocks": [
-    {
-      "id": 10,
-      "name": "スマートフォン",
-      "code": "SP001",
-      "quantity": 5,
-      "unit": "台",
-      "price": 60000.0,
-      "category": "電子機器",
-      "location": "A-2-1",
-      "created_at": "2025-07-15T09:00:00Z",
-      "updated_at": "2025-07-15T09:00:00Z"
-    }
-  ]
-}
+{ "ids": [1,2,3], "updates": { "category": "新カテゴリ" } }
 ```
 
-**必要な権限:** user, manager, admin
+#### 詳細統計
 
----
+```http
+GET /api/v2/stocks/statistics
+```
 
 ### Excel連携
 
@@ -362,126 +347,24 @@ Content-Type: multipart/form-data
 
 ---
 
-### 統計・分析
-
-#### 在庫統計取得
+### ヘルスチェック
 
 ```http
-GET /api/stats/inventory
+GET /api/health
 ```
 
-**レスポンス例:**
-```json
-{
-  "total_items": 500,
-  "total_value": 12500000.0,
-  "categories": {
-    "電子機器": {
-      "item_count": 150,
-      "total_quantity": 800,
-      "total_value": 8500000.0
-    },
-    "オフィス用品": {
-      "item_count": 200,
-      "total_quantity": 2500,
-      "total_value": 250000.0
-    }
-  },
-  "out_of_stock_count": 5,
-  "low_stock_count": 15
-}
-```
-
-**必要な権限:** manager, admin
-
----
+公開エンドポイント。`{"status":"ok","timestamp":"..."}` を返します。
 
 ## 認証・ユーザー管理
 
-### ユーザー登録
+ユーザー作成・パスワードリセット等の関数は内部には存在しますが、現在公開APIはログイン（`POST /api/auth/login`）のみです。
 
-```http
-POST /auth/register
-```
+## レート制限（実装）
 
-**リクエストボディ:**
-```json
-{
-  "username": "newuser",
-  "password": "SecurePass123!",
-  "email": "newuser@example.com",
-  "role": "user"
-}
-```
-
-**パスワード要件:**
-- 8文字以上
-- 大文字・小文字・数字・特殊文字を含む
-
-**レスポンス例:**
-```json
-{
-  "message": "ユーザーが正常に作成されました",
-  "username": "newuser",
-  "role": "user"
-}
-```
-
-**必要な権限:** admin
-
----
-
-### パスワードリセット
-
-```http
-POST /auth/password-reset
-```
-
-**リクエストボディ:**
-```json
-{
-  "username": "username"
-}
-```
-
-**レスポンス例:**
-```json
-{
-  "message": "パスワードリセットトークンが生成されました",
-  "reset_token": "abc123def456"
-}
-```
-
----
-
-### パスワードリセット実行
-
-```http
-POST /auth/password-reset/confirm
-```
-
-**リクエストボディ:**
-```json
-{
-  "reset_token": "abc123def456",
-  "new_password": "NewSecurePass123!"
-}
-```
-
-**レスポンス例:**
-```json
-{
-  "message": "パスワードが正常に更新されました"
-}
-```
-
----
-
-## レート制限
-
-- **一般API**: 100リクエスト/分
-- **認証API**: 10リクエスト/分
-- **ファイルアップロード**: 5リクエスト/分
+- 認証ログイン: 10 リクエスト/分（IP単位）
+- 在庫作成/削除（v1/v2）: 120 リクエスト/分（IP単位）
+- 在庫更新（v1/v2）: 240 リクエスト/分（IP単位）
+- GET 系は現状レート制限なし
 
 レート制限に達した場合、HTTP 429 ステータスコードが返されます。
 
@@ -517,7 +400,7 @@ auth_response = HTTP.post(
 auth_data = JSON3.read(auth_response.body)
 token = auth_data.token
 
-# 在庫一覧取得
+# 在庫一覧取得（v1）
 headers = ["Authorization" => "Bearer $token"]
 response = HTTP.get("http://localhost:8000/api/stocks", headers=headers)
 stocks = JSON3.read(response.body)
@@ -536,7 +419,7 @@ auth_response = requests.post(
 )
 token = auth_response.json()["token"]
 
-# 在庫一覧取得
+# 在庫一覧取得（v1）
 headers = {"Authorization": f"Bearer {token}"}
 response = requests.get("http://localhost:8000/api/stocks", headers=headers)
 stocks = response.json()
@@ -553,7 +436,7 @@ const authResponse = await fetch('http://localhost:8000/api/auth/login', {
 });
 const { token } = await authResponse.json();
 
-// 在庫一覧取得
+// 在庫一覧取得（v1）
 const response = await fetch('http://localhost:8000/api/stocks', {
   headers: { 'Authorization': `Bearer ${token}` }
 });
@@ -576,4 +459,3 @@ const stocks = await response.json();
 技術サポートが必要な場合は、以下までお問い合わせください：
 
 - **GitHub Issues**: https://github.com/SilentMalachite/julia_stock/issues
-

@@ -139,11 +139,9 @@ function authenticate_request(token::Union{String, Nothing})::Union{User, Nothin
     if token === nothing
         return nothing
     end
-    
+
     try
-        # JWTトークンを検証（簡単のため、authenticate_userを再利用）
-        # 実際にはJWT検証ロジックが必要
-        return nothing  # 今回は簡略化
+        return verify_jwt_token(token)
     catch e
         log_warning("認証エラー", Dict("error" => string(e)))
         return nothing

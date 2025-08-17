@@ -6,6 +6,8 @@ using Dates
 
 include("../models/Stock.jl")
 include("../database/DuckDBConnection.jl")
+include("../database/ConnectionPool.jl")
+include("../database/SecureDuckDBConnection.jl")
 
 export export_to_excel, import_from_excel
 
@@ -16,7 +18,27 @@ function export_to_excel(filepath::String, data::Union{DataFrame, Nothing}=nothi
     try
         # データが指定されていない場合は、データベースから全在庫を取得
         if isnothing(data)
-            data = Stock.all()
+            conn = ConnectionPool.get_connection_from_pool()
+            try
+                stocks = SecureDuckDBConnection.secure_get_all_stocks(conn)
+                data = DataFrame(
+                    id = [s.id for s in stocks],
+                    product_code = [s.code for s in stocks],
+                    product_name = [s.name for s in stocks],
+                    category = [s.category for s in stocks],
+                    quantity = [s.quantity for s in stocks],
+                    unit = [s.unit for s in stocks],
+                    price = [s.price for s in stocks],
+                    location = [s.location for s in stocks],
+                    created_at = [s.created_at for s in stocks],
+                    updated_at = [s.updated_at for s in stocks]
+                )
+            finally
+                try
+                    ConnectionPool.return_connection_to_pool(conn)
+                catch
+                end
+            end
         end
         
         # DataFrameが空の場合の処理
@@ -73,18 +95,36 @@ function import_from_excel(filepath::String)
         for row in eachrow(df)
             try
                 stock_data = Dict(
-                    "product_code" => get(row, :product_code, ""),
-                    "product_name" => get(row, :product_name, ""),
-                    "category" => get(row, :category, "その他"),
-                    "quantity" => get(row, :quantity, 0),
-                    "unit" => get(row, :unit, "個"),
-                    "price" => get(row, :price, 0.0),
-                    "location" => get(row, :location, ""),
-                    "description" => get(row, :description, "")
+                    "product_code" => _getrow(row, :product_code, ""),
+                    "product_name" => _getrow(row, :product_name, ""),
+                    "category" => _getrow(row, :category, "その他"),
+                    "quantity" => _getrow(row, :quantity, 0),
+                    "unit" => _getrow(row, :unit, "個"),
+                    "price" => _getrow(row, :price, 0.0),
+                    "location" => _getrow(row, :location, "")
                 )
-                
-                # データベースに挿入
-                Stock.create(stock_data)
+                # 保存
+                code = String(get(stock_data, "product_code", ""))
+                name = String(get(stock_data, "product_name", ""))
+                category = String(get(stock_data, "category", "その他"))
+                unit = String(get(stock_data, "unit", "個"))
+                location = String(get(stock_data, "location", ""))
+                qv = get(stock_data, "quantity", 0)
+                quantity = isa(qv, String) ? (tryparse(Int, qv) === nothing ? 0 : tryparse(Int, qv)) : Int(qv)
+                pv = get(stock_data, "price", 0.0)
+                price = isa(pv, String) ? (tryparse(Float64, pv) === nothing ? 0.0 : tryparse(Float64, pv)) : Float64(pv)
+                nowdt = now()
+                id = Int64(round(datetime2unix(now()) * 1000))
+                stock = StockModel.Stock(id, name, code, quantity, unit, price, category, location, nowdt, nowdt)
+                conn = ConnectionPool.get_connection_from_pool()
+                try
+                    SecureDuckDBConnection.secure_insert_stock(conn, stock)
+                finally
+                    try
+                        ConnectionPool.return_connection_to_pool(conn)
+                    catch
+                    end
+                end
                 imported_count += 1
                 
             catch e
@@ -98,6 +138,17 @@ function import_from_excel(filepath::String)
         
     catch e
         error("Excelインポートに失敗しました: $e")
+    end
+end
+
+# DataFrameRow 安全取得
+function _getrow(row, col::Symbol, default)
+    namesyms = propertynames(row)
+    if col in namesyms
+        val = row[col]
+        return val === missing ? default : val
+    else
+        return default
     end
 end
 

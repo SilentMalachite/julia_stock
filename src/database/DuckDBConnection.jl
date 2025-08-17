@@ -8,7 +8,8 @@ using ..StockModel
 export db_connect, db_close, create_stock_table, table_exists,
        insert_stock, get_all_stocks, get_stock_by_id, update_stock, delete_stock,
        get_stocks_by_category, get_out_of_stock_items, get_low_stock_items,
-       begin_transaction, commit_transaction, rollback_transaction
+       begin_transaction, commit_transaction, rollback_transaction,
+       execute_query
 
 function db_connect(db_path::String = ":memory:")::DuckDB.DB
     """
@@ -24,6 +25,18 @@ function db_connect(db_path::String = ":memory:")::DuckDB.DB
         return DuckDB.DB(db_path)
     catch e
         error("データベース接続に失敗しました: $e")
+    end
+end
+
+"""
+任意のクエリを実行してDataFrameを返す（パラメータ化対応）
+"""
+function execute_query(conn::DuckDB.DB, sql::AbstractString, params::AbstractVector = Any[])::DataFrame
+    try
+        result = isempty(params) ? DuckDB.execute(conn, sql) : DuckDB.execute(conn, sql, params)
+        return DataFrame(result)
+    catch e
+        error("クエリ実行に失敗しました: $e")
     end
 end
 

@@ -57,7 +57,8 @@ export Stock, add_quantity, reduce_quantity, filter_by_category, filter_out_of_s
        # 接続プール
        init_connection_pool, cleanup_connection_pool, get_connection_from_pool,
        return_connection_to_pool, get_pool_statistics, is_connection_healthy,
-       with_transaction, recover_connection_pool,
+       with_transaction, recover_connection_pool, cleanup_idle_connections,
+       get_pool_configuration, should_alert_high_usage, detect_connection_leaks,
        # Excel機能
        create_empty_excel, export_stocks_to_excel, import_stocks_from_excel,
        create_stock_template, get_excel_headers, validate_excel_format,
@@ -118,7 +119,7 @@ function start_server(port::Int = 8000)
         println("   - 在庫一覧: http://localhost:$port/api/stocks")
         println("\n🔐 認証:")
         println("   - ログイン: POST /api/auth/login")
-        println("   - デフォルト管理者: admin / AdminPass123!")
+        println("   - 管理者の初期化: 環境変数 ADMIN_DEFAULT_PASSWORD を使用（任意）")
         println("\n📖 ドキュメント: docs/API_SPECIFICATION.md")
         println("📋 運用マニュアル: docs/OPERATIONS_MANUAL.md")
         
@@ -141,13 +142,21 @@ function ensure_default_admin()
     try
         users = get_all_users()
         admin_exists = any(user -> user.role == "admin", users)
-        
+
         if !admin_exists
-            admin_user = create_user("admin", "AdminPass123!", "admin@inventory.system", "admin")
-            log_info("デフォルト管理者アカウントを作成しました", Dict(
-                "username" => admin_user.username
-            ))
-            println("   管理者アカウントを作成しました (admin / AdminPass123!)")
+            default_pw = get(ENV, "ADMIN_DEFAULT_PASSWORD", "")
+            default_email = get(ENV, "ADMIN_DEFAULT_EMAIL", "admin@inventory.system")
+            if !isempty(default_pw)
+                # 最低要件チェック
+                if length(default_pw) < 12 || !occursin(r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*]).{12,}$", default_pw)
+                    log_warning("ADMIN_DEFAULT_PASSWORD が弱すぎるため管理者は作成されません")
+                else
+                    admin_user = create_user("admin", default_pw, default_email, "admin")
+                    log_info("管理者アカウントを初期作成しました", Dict("username" => admin_user.username))
+                end
+            else
+                log_info("管理者アカウントは未作成（ADMIN_DEFAULT_PASSWORD 未設定）")
+            end
         else
             log_info("管理者アカウントが確認されました")
         end

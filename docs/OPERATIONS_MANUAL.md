@@ -13,6 +13,8 @@
 
 ---
 
+注意: 本マニュアルの一部（定期メンテナンスや監視スクリプト例など）は参考実装です。リポジトリに含まれないスクリプト名が登場する箇所は、運用環境に合わせて作成してください（同等の手順は手動でも実施可能です）。
+
 ## システム概要
 
 ### アーキテクチャ
@@ -73,36 +75,21 @@ chmod 755 data logs backups
 
 #### 4. 環境変数の設定
 
-`.env` ファイルを作成：
+本システムは一部の設定を環境変数から読み込みます。最低限、以下を設定してください。
 
 ```bash
-# データベース設定
-DB_PATH=data/inventory.db
-AUTH_DB_PATH=data/auth.db
+# JWT（必須）
+export JWT_SECRET="change-me-to-a-strong-secret"   # 16文字以上推奨
 
-# サーバー設定
-SERVER_PORT=8000
-SERVER_HOST=0.0.0.0
+# デフォルト管理者の自動作成（任意・強度チェックあり）
+export ADMIN_DEFAULT_PASSWORD="YourStrongAdminPass!23"
+export ADMIN_DEFAULT_EMAIL="admin@company.com"
 
-# JWT設定
-JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
-JWT_EXPIRY=86400
-
-# ログ設定
-LOG_LEVEL=INFO
-LOG_MAX_FILE_SIZE=10485760
-LOG_MAX_FILES=5
-
-# セキュリティ設定
-MAX_LOGIN_ATTEMPTS=5
-ACCOUNT_LOCK_DURATION=3600
-PASSWORD_MIN_LENGTH=8
-
-# パフォーマンス設定
-DB_POOL_MAX_CONNECTIONS=20
-DB_POOL_MIN_CONNECTIONS=5
-DB_CONNECTION_TIMEOUT=30
+# パスワードハッシュのストレッチ回数（任意・既定: 10000, 下限: 1000）
+export PASSWORD_HASH_ITERATIONS=10000
 ```
+
+注: `.env` ファイルの自動読み込みは現状行っていません。必要に応じてプロセスマネージャやシェル起動スクリプトで変数を読み込んでください。
 
 #### 5. データベースの初期化
 
@@ -823,6 +810,4 @@ ENV["JULIA_GC_POOL_DELAYED"] = "0"
 using PackageCompiler
 create_sysimage(["Genie", "DuckDB", "JSON3"], sysimage_path="inventory_system.so")
 ```
-
-
 
