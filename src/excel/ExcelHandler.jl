@@ -7,7 +7,6 @@ using Dates
 include("../models/Stock.jl")
 include("../database/DuckDBConnection.jl")
 include("../database/ConnectionPool.jl")
-include("../database/SecureDuckDBConnection.jl")
 
 export export_to_excel, import_from_excel
 
@@ -20,7 +19,7 @@ function export_to_excel(filepath::String, data::Union{DataFrame, Nothing}=nothi
         if isnothing(data)
             conn = ConnectionPool.get_connection_from_pool()
             try
-                stocks = SecureDuckDBConnection.secure_get_all_stocks(conn)
+                stocks = DuckDBConnection.get_all_stocks(conn)
                 data = DataFrame(
                     id = [s.id for s in stocks],
                     product_code = [s.code for s in stocks],
@@ -118,7 +117,7 @@ function import_from_excel(filepath::String)
                 stock = StockModel.Stock(id, name, code, quantity, unit, price, category, location, nowdt, nowdt)
                 conn = ConnectionPool.get_connection_from_pool()
                 try
-                    SecureDuckDBConnection.secure_insert_stock(conn, stock)
+                    DuckDBConnection.insert_stock(conn, stock)
                 finally
                     try
                         ConnectionPool.return_connection_to_pool(conn)

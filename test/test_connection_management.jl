@@ -10,8 +10,8 @@ using .InventorySystem: init_connection_pool, cleanup_connection_pool,
                        with_transaction, recover_connection_pool,
                        get_pool_configuration, cleanup_idle_connections,
                        should_alert_high_usage, detect_connection_leaks,
-                       secure_create_stock_table, secure_insert_stock,
-                       secure_get_all_stocks, Stock
+                       create_stock_table, insert_stock,
+                       get_all_stocks, Stock
 
 @testset "Database Connection Management Tests" begin
     
@@ -164,29 +164,29 @@ using .InventorySystem: init_connection_pool, cleanup_connection_pool,
         init_connection_pool(max_connections=3)
         
         conn = get_connection_from_pool()
-        secure_create_stock_table(conn)
+        create_stock_table(conn)
         
         # テスト: 自動トランザクション管理
         @test_nowarn with_transaction(() -> begin
             stock1 = Stock(1, "トランザクションテスト1", "TXN001", 100, "個", 1000.0, "カテゴリ", "場所", now(), now())
             stock2 = Stock(2, "トランザクションテスト2", "TXN002", 50, "個", 2000.0, "カテゴリ", "場所", now(), now())
-            secure_insert_stock(conn, stock1)
-            secure_insert_stock(conn, stock2)
+            insert_stock(conn, stock1)
+            insert_stock(conn, stock2)
         end, conn)
         
         # データが正常にコミットされていることを確認
-        stocks = secure_get_all_stocks(conn)
+        stocks = get_all_stocks(conn)
         @test length(stocks) == 2
         
         # テスト: トランザクションのロールバック
         @test_throws Exception with_transaction(() -> begin
             stock3 = Stock(3, "失敗テスト", "FAIL001", 75, "個", 1500.0, "カテゴリ", "場所", now(), now())
-            secure_insert_stock(conn, stock3)
+            insert_stock(conn, stock3)
             throw(ArgumentError("テストエラー"))
         end, conn)
         
         # ロールバックにより、3番目のデータは挿入されていないことを確認
-        stocks_after_rollback = secure_get_all_stocks(conn)
+        stocks_after_rollback = get_all_stocks(conn)
         @test length(stocks_after_rollback) == 2
         
         return_connection_to_pool(conn)

@@ -11,7 +11,6 @@ using Genie.Requests
 include("../../models/Stock.jl")
 include("../../database/DuckDBConnection.jl")
 include("../../database/ConnectionPool.jl")
-include("../../database/SecureDuckDBConnection.jl")
 using DuckDB
 using Random
 
@@ -239,10 +238,10 @@ function create_with_validation(payload::Dict)
         # Stock構築
         stock = Stock(id, name, code, quantity, unit, price, category, location, nowdt, nowdt)
 
-        # DB挿入（セキュア）
+        # DB挿入
         conn = ConnectionPool.get_connection_from_pool()
         try
-            SecureDuckDBConnection.secure_insert_stock(conn, stock)
+            DuckDBConnection.insert_stock(conn, stock)
         finally
             try
                 ConnectionPool.return_connection_to_pool(conn)
@@ -362,7 +361,7 @@ function bulk_update()
         try
             for id in ids
                 try
-                    existing = SecureDuckDBConnection.secure_get_stock_by_id(conn, id)
+                    existing = DuckDBConnection.get_stock_by_id(conn, id)
                     if existing === nothing
                         continue
                     end
@@ -377,7 +376,7 @@ function bulk_update()
                     price = isa(pval, String) ? (tryparse(Float64, pval) === nothing ? existing.price : tryparse(Float64, pval)) : Float64(pval)
                     updated = Stock(existing.id, name, code, quantity, unit, price,
                                     category, location, existing.created_at, now())
-                    SecureDuckDBConnection.secure_update_stock(conn, updated)
+                    DuckDBConnection.update_stock(conn, updated)
                     updated_count += 1
                 catch
                     # 個別のエラーはスキップ
@@ -416,7 +415,7 @@ function bulk_update(payload::Dict{String,Any})
         try
             for id in ids
                 try
-                    existing = SecureDuckDBConnection.secure_get_stock_by_id(conn, id)
+                    existing = DuckDBConnection.get_stock_by_id(conn, id)
                     if existing === nothing
                         continue
                     end
@@ -431,7 +430,7 @@ function bulk_update(payload::Dict{String,Any})
                     price = isa(pval, String) ? (tryparse(Float64, pval) === nothing ? existing.price : tryparse(Float64, pval)) : Float64(pval)
                     updated = Stock(existing.id, name, code, quantity, unit, price,
                                     category, location, existing.created_at, now())
-                    SecureDuckDBConnection.secure_update_stock(conn, updated)
+                    DuckDBConnection.update_stock(conn, updated)
                     updated_count += 1
                 catch
                 end
@@ -542,7 +541,7 @@ function update_with_validation(id::Int)
 
         conn = ConnectionPool.get_connection_from_pool()
         try
-            existing = SecureDuckDBConnection.secure_get_stock_by_id(conn, id)
+            existing = DuckDBConnection.get_stock_by_id(conn, id)
             if existing === nothing
                 return json(Dict("error" => "在庫が見つかりません"), status=404)
             end
@@ -567,7 +566,7 @@ function update_with_validation(id::Int)
 
             updated_stock = Stock(existing.id, name, code, quantity, unit, price,
                                   category, location, existing.created_at, now())
-            SecureDuckDBConnection.secure_update_stock(conn, updated_stock)
+            DuckDBConnection.update_stock(conn, updated_stock)
 
             response = Dict(
                 "id" => updated_stock.id,
@@ -600,7 +599,7 @@ function update_with_validation(id::Int, updates::Dict{String,Any})
     try
         conn = ConnectionPool.get_connection_from_pool()
         try
-            existing = SecureDuckDBConnection.secure_get_stock_by_id(conn, id)
+            existing = DuckDBConnection.get_stock_by_id(conn, id)
             if existing === nothing
                 return json(Dict("error" => "在庫が見つかりません"), status=404)
             end
@@ -621,7 +620,7 @@ function update_with_validation(id::Int, updates::Dict{String,Any})
             end
             updated_stock = Stock(existing.id, name, code, quantity, unit, price,
                                   category, location, existing.created_at, now())
-            SecureDuckDBConnection.secure_update_stock(conn, updated_stock)
+            DuckDBConnection.update_stock(conn, updated_stock)
             response = Dict(
                 "id" => updated_stock.id,
                 "product_code" => updated_stock.code,
@@ -653,11 +652,11 @@ function destroy(id::Int)
     try
         conn = ConnectionPool.get_connection_from_pool()
         try
-            existing = SecureDuckDBConnection.secure_get_stock_by_id(conn, id)
+            existing = DuckDBConnection.get_stock_by_id(conn, id)
             if existing === nothing
                 return json(Dict("error" => "在庫が見つかりません"), status=404)
             end
-            SecureDuckDBConnection.secure_delete_stock(conn, id)
+            DuckDBConnection.delete_stock(conn, id)
             return json(Dict("message" => "在庫が正常に削除されました"), status=200)
         finally
             try
