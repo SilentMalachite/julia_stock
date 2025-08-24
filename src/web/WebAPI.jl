@@ -10,7 +10,7 @@ using JSON3
 using Dates
 using DuckDB
 using ..StockModel
-using ..SecureDuckDBConnection
+using ..DuckDBConnection
 using ..AuthenticationSystem
 using ..ErrorHandling
 using ..ConnectionPool
@@ -114,7 +114,7 @@ function add_test_stock(stock::Stock)
     """
     conn = get_connection_from_pool()
     try
-        secure_insert_stock(conn, stock)
+        insert_stock(conn, stock)
     finally
         return_connection_to_pool(conn)
     end
@@ -161,9 +161,9 @@ function setup_routes()
                 category = get(params(), :category, nothing)
                 
                 stocks = if category !== nothing
-                    secure_get_stocks_by_category(conn, string(category))
+                    get_stocks_by_category(conn, string(category))
                 else
-                    secure_get_all_stocks(conn)
+                    get_all_stocks(conn)
                 end
             
             # JSON形式で返す

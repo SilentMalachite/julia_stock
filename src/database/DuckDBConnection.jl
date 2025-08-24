@@ -13,14 +13,27 @@ export db_connect, db_close, create_stock_table, table_exists,
 
 function db_connect(db_path::String = ":memory:")::DuckDB.DB
     """
-    DuckDBデータベースへの接続を確立する
+    セキュアなDuckDBデータベース接続を確立する
     
     Args:
-        db_path: データベースファイルのパス。デフォルトはインメモリ
+        db_path: データベースファイルのパス
     
     Returns:
         DuckDB.DB: データベース接続オブジェクト
     """
+    if db_path != ":memory:"
+        # パストラバーサル攻撃の防止
+        if occursin(r"\.\.", db_path) || occursin(r"[/\\]\.\.+[/\\]", db_path)
+            throw(ArgumentError("不正なデータベースパスです"))
+        end
+
+        # 特殊なデバイスファイルの防止
+        dangerous_paths = ["/dev/", "/proc/", "/sys/", "\\\\", "/etc/"]
+        if any(contains(db_path, dangerous) for dangerous in dangerous_paths)
+            throw(ArgumentError("システムパスへのアクセスは禁止されています"))
+        end
+    end
+
     try
         return DuckDB.DB(db_path)
     catch e
@@ -64,13 +77,13 @@ function create_stock_table(conn::DuckDB.DB)
     sql = """
     CREATE TABLE IF NOT EXISTS stocks (
         id INTEGER PRIMARY KEY,
-        name VARCHAR NOT NULL,
-        code VARCHAR UNIQUE NOT NULL,
+        name VARCHAR(255) NOT NULL CHECK (length(name) > 0 AND length(name) <= 255),
+        code VARCHAR(50) UNIQUE NOT NULL CHECK (length(code) > 0 AND length(code) <= 50),
         quantity INTEGER NOT NULL CHECK (quantity >= 0),
-        unit VARCHAR NOT NULL,
+        unit VARCHAR(20) NOT NULL CHECK (length(unit) > 0 AND length(unit) <= 20),
         price DECIMAL(10,2) NOT NULL CHECK (price >= 0),
-        category VARCHAR NOT NULL,
-        location VARCHAR NOT NULL,
+        category VARCHAR(100) NOT NULL CHECK (length(category) > 0 AND length(category) <= 100),
+        location VARCHAR(100) NOT NULL CHECK (length(location) > 0 AND length(location) <= 100),
         created_at TIMESTAMP NOT NULL,
         updated_at TIMESTAMP NOT NULL
     )
@@ -94,6 +107,11 @@ function table_exists(conn::DuckDB.DB, table_name::String)::Bool
     Returns:
         Bool: テーブルが存在する場合はtrue
     """
+    # テーブル名の検証 (英数字とアンダースコアのみ許可)
+    if !occursin(r"^[a-zA-Z_][a-zA-Z0-9_]*$", table_name)
+        throw(ArgumentError("不正なテーブル名です"))
+    end
+
     sql = "SELECT COUNT(*) as count FROM information_schema.tables WHERE table_name = ?"
     
     try
@@ -114,6 +132,14 @@ function insert_stock(conn::DuckDB.DB, stock::Stock)
         conn: データベース接続オブジェクト
         stock: 在庫データ
     """
+    # 基本的な入力値チェック
+    if stock.quantity < 0
+        throw(ArgumentError("数量は0以上である必要があります"))
+    end
+    if stock.price < 0
+        throw(ArgumentError("価格は0以上である必要があります"))
+    end
+
     sql = """
     INSERT INTO stocks (id, name, code, quantity, unit, price, category, location, created_at, updated_at)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -170,6 +196,10 @@ function get_stock_by_id(conn::DuckDB.DB, id::Int64)::Union{Stock, Nothing}
     Returns:
         Union{Stock, Nothing}: 在庫データまたはNothing
     """
+    if id <= 0
+        throw(ArgumentError("IDは正の整数である必要があります"))
+    end
+
     sql = "SELECT * FROM stocks WHERE id = ?"
     
     try
@@ -198,6 +228,14 @@ function update_stock(conn::DuckDB.DB, stock::Stock)
         conn: データベース接続オブジェクト
         stock: 更新する在庫データ
     """
+    # 基本的な入力値チェック
+    if stock.quantity < 0
+        throw(ArgumentError("数量は0以上である必要があります"))
+    end
+    if stock.price < 0
+        throw(ArgumentError("価格は0以上である必要があります"))
+    end
+
     sql = """
     UPDATE stocks 
     SET name = ?, code = ?, quantity = ?, unit = ?, price = ?, 
@@ -223,6 +261,10 @@ function delete_stock(conn::DuckDB.DB, id::Int64)
         conn: データベース接続オブジェクト
         id: 削除する在庫ID
     """
+    if id <= 0
+        throw(ArgumentError("IDは正の整数である必要があります"))
+    end
+
     sql = "DELETE FROM stocks WHERE id = ?"
     
     try
@@ -304,6 +346,10 @@ function get_low_stock_items(conn::DuckDB.DB, threshold::Int64)::Vector{Stock}
     Returns:
         Vector{Stock}: 低在庫商品のベクター
     """
+    if threshold < 0
+        throw(ArgumentError("閾値は0以上である必要があります"))
+    end
+
     sql = "SELECT * FROM stocks WHERE quantity < ? ORDER BY quantity, id"
     
     try

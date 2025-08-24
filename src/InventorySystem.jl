@@ -16,15 +16,11 @@ using .ErrorHandling
 include("auth/AuthenticationSystem.jl")
 using .AuthenticationSystem
 
-# 4. 基本データベース接続
+# 4. データベース接続
 include("database/DuckDBConnection.jl")
 using .DuckDBConnection
 
-# 5. セキュアデータベース接続（StockModelに依存）
-include("database/SecureDuckDBConnection.jl")
-using .SecureDuckDBConnection
-
-# 6. 接続プール（ErrorHandlingに依存）
+# 5. 接続プール（ErrorHandlingに依存）
 include("database/ConnectionPool.jl")
 using .ConnectionPool
 
@@ -43,12 +39,7 @@ export Stock, add_quantity, reduce_quantity, filter_by_category, filter_out_of_s
        db_connect, db_close, create_stock_table, table_exists,
        insert_stock, get_all_stocks, get_stock_by_id, update_stock, delete_stock,
        get_stocks_by_category, get_out_of_stock_items, get_low_stock_items,
-       begin_transaction, commit_transaction, rollback_transaction,
-       # セキュア接続関数
-       secure_db_connect, secure_db_close, secure_create_stock_table, secure_table_exists,
-       secure_insert_stock, secure_get_all_stocks, secure_get_stock_by_id, secure_update_stock, 
-       secure_delete_stock, secure_get_stocks_by_category, secure_get_out_of_stock_items, 
-       secure_get_low_stock_items, secure_execute,
+       begin_transaction, commit_transaction, rollback_transaction, execute_query,
        # 認証システム
        init_auth_database, create_user, authenticate_user, delete_user, get_all_users,
        change_password, is_account_locked, unlock_account, 
@@ -98,7 +89,7 @@ function start_server(port::Int = 8000)
         println("メインデータベースを初期化中...")
         conn = get_connection_from_pool()
         try
-            secure_create_stock_table(conn)
+            create_stock_table(conn)
             log_info("在庫テーブルが準備されました")
         finally
             return_connection_to_pool(conn)
@@ -222,9 +213,9 @@ function system_info()
     try
         conn = get_connection_from_pool()
         try
-            all_stocks = secure_get_all_stocks(conn)
-            out_of_stock = secure_get_out_of_stock_items(conn)
-            low_stock = secure_get_low_stock_items(conn, 10)
+            all_stocks = get_all_stocks(conn)
+            out_of_stock = get_out_of_stock_items(conn)
+            low_stock = get_low_stock_items(conn, 10)
             
             println("\n📦 在庫統計:")
             println("   総在庫アイテム数: $(length(all_stocks))")

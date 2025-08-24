@@ -9,7 +9,7 @@ using Genie.Renderers.Json
 
 include("../../models/Stock.jl")
 include("../../database/ConnectionPool.jl")
-include("../../database/SecureDuckDBConnection.jl")
+include("../../database/DuckDBConnection.jl")
 
 """
 全在庫一覧を取得
@@ -17,7 +17,7 @@ include("../../database/SecureDuckDBConnection.jl")
 function index()
     try
         conn = ConnectionPool.get_connection_from_pool()
-        stocks = SecureDuckDBConnection.secure_get_all_stocks(conn)
+        stocks = DuckDBConnection.get_all_stocks(conn)
         # レスポンス用に整形
         items = [
             Dict(
@@ -50,7 +50,7 @@ end
 function show(id::Int)
     try
         conn = ConnectionPool.get_connection_from_pool()
-        s = SecureDuckDBConnection.secure_get_stock_by_id(conn, id)
+        s = DuckDBConnection.get_stock_by_id(conn, id)
         if s === nothing
             return json(Dict("error" => "在庫が見つかりません"), status=404)
         end
@@ -104,7 +104,7 @@ function create(payload::Dict)
 
         conn = ConnectionPool.get_connection_from_pool()
         try
-            SecureDuckDBConnection.secure_insert_stock(conn, stock)
+            DuckDBConnection.insert_stock(conn, stock)
         finally
             try
                 ConnectionPool.return_connection_to_pool(conn)
@@ -137,7 +137,7 @@ end
 function update(id::Int, payload::Dict)
     try
         conn = ConnectionPool.get_connection_from_pool()
-        s = SecureDuckDBConnection.secure_get_stock_by_id(conn, id)
+        s = DuckDBConnection.get_stock_by_id(conn, id)
         if s === nothing
             return json(Dict("error" => "在庫が見つかりません"), status=404)
         end
@@ -151,7 +151,7 @@ function update(id::Int, payload::Dict)
         pv = haskey(payload, "price") ? payload["price"] : s.price
         price = isa(pv, String) ? (tryparse(Float64, pv) === nothing ? s.price : tryparse(Float64, pv)) : Float64(pv)
         updated = StockModel.Stock(s.id, name, code, quantity, unit, price, category, location, s.created_at, now())
-        SecureDuckDBConnection.secure_update_stock(conn, updated)
+        DuckDBConnection.update_stock(conn, updated)
         response_data = Dict(
             :id => updated.id,
             :product_code => updated.code,
@@ -181,11 +181,11 @@ end
 function destroy(id::Int)
     try
         conn = ConnectionPool.get_connection_from_pool()
-        s = SecureDuckDBConnection.secure_get_stock_by_id(conn, id)
+        s = DuckDBConnection.get_stock_by_id(conn, id)
         if s === nothing
             return json(Dict("error" => "在庫が見つかりません"), status=404)
         end
-        SecureDuckDBConnection.secure_delete_stock(conn, id)
+        DuckDBConnection.delete_stock(conn, id)
         return json(Dict("message" => "在庫が正常に削除されました"), status=200)
     catch e
         return json(Dict("error" => "在庫の削除に失敗しました: $(e)"), status=500)
