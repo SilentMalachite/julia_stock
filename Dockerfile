@@ -1,5 +1,5 @@
 # Julia在庫管理システム - Docker Image
-FROM julia:1.11-slim
+FROM julia:1.10
 
 # メタデータ
 LABEL maintainer="Julia在庫管理システム開発チーム"
@@ -32,7 +32,7 @@ RUN mkdir -p data logs backups && \
 COPY Project.toml Manifest.toml ./
 
 # Julia依存関係をインストール
-RUN julia --project=. -e "using Pkg; Pkg.instantiate(); Pkg.precompile()"
+RUN julia --project=. -e "using Pkg; Pkg.resolve(); Pkg.instantiate(); Pkg.precompile()"
 
 # アプリケーションファイルをコピー
 COPY --chown=inventory:inventory src/ ./src/

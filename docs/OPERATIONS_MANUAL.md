@@ -46,7 +46,7 @@
 
 ### 前提条件
 
-- **Julia**: 1.9以上
+- **Julia**: 1.9 または 1.10（CIで検証済）
 - **OS**: Linux, macOS, Windows
 - **メモリ**: 最低2GB、推奨8GB
 - **ディスク**: 最低10GB、推奨50GB
@@ -60,10 +60,12 @@ git clone https://github.com/SilentMalachite/julia_stock.git
 cd julia_stock
 ```
 
-#### 2. 依存関係のインストール
+#### 2. 依存関係のインストール/再解決
+
+Juliaの小数点バージョン差異（例: 1.9 ↔ 1.10）を跨ぐ場合に備え、まず`resolve`を行います。
 
 ```bash
-julia --project=. -e "using Pkg; Pkg.instantiate()"
+julia --project=. -e "using Pkg; Pkg.resolve(); Pkg.instantiate()"
 ```
 
 #### 3. ディレクトリ構造の確認
@@ -484,7 +486,7 @@ tail -n 50 logs/error.log
 
 **解決策**:
 ```bash
-# パッケージの再インストール
+# 依存関係の再解決と再インストール（環境差異の吸収）
 julia --project=. -e "using Pkg; Pkg.resolve(); Pkg.instantiate()"
 
 # ポートの変更（必要に応じて）
@@ -810,4 +812,3 @@ ENV["JULIA_GC_POOL_DELAYED"] = "0"
 using PackageCompiler
 create_sysimage(["Genie", "DuckDB", "JSON3"], sysimage_path="inventory_system.so")
 ```
-

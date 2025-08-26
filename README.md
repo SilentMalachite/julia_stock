@@ -3,7 +3,7 @@
 [![CI](https://github.com/SilentMalachite/julia_stock/actions/workflows/ci.yml/badge.svg)](https://github.com/SilentMalachite/julia_stock/actions/workflows/ci.yml)
 [![Deploy](https://github.com/SilentMalachite/julia_stock/actions/workflows/deploy.yml/badge.svg)](https://github.com/SilentMalachite/julia_stock/actions/workflows/deploy.yml)
 [![CodeQL](https://github.com/SilentMalachite/julia_stock/actions/workflows/codeql.yml/badge.svg)](https://github.com/SilentMalachite/julia_stock/actions/workflows/codeql.yml)
-[![Julia](https://img.shields.io/badge/Julia-1.9+-9558B2?style=flat&logo=julia&logoColor=white)](https://julialang.org/)
+[![Julia](https://img.shields.io/badge/Julia-1.9%20%2F%201.10-9558B2?style=flat&logo=julia&logoColor=white)](https://julialang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![DuckDB](https://img.shields.io/badge/DuckDB-0.9+-FFF000?style=flat&logo=duckdb&logoColor=black)](https://duckdb.org/)
 [![Genie](https://img.shields.io/badge/Genie-5.0+-E24A33?style=flat)](https://genieframework.com/)
@@ -88,7 +88,7 @@
 
 ### 前提条件
 
-- **Julia 1.9+** 
+- **Julia 1.9 / 1.10**（CIで検証済）
 - **OS**: macOS, Linux, Windows
 - **メモリ**: 4GB以上推奨
 - **ディスク**: 1GB以上の空き容量
@@ -100,8 +100,8 @@
 git clone https://github.com/SilentMalachite/julia_stock.git
 cd julia_stock
 
-# 依存関係をインストール
-julia --project=. -e "using Pkg; Pkg.instantiate()"
+# 依存関係を解決・インストール（Juliaの小数点バージョン差異に対応）
+julia --project=. -e "using Pkg; Pkg.resolve(); Pkg.instantiate()"
 
 # 必要なディレクトリを作成
 mkdir -p data logs backups
@@ -303,10 +303,19 @@ ENV["JULIA_GC_ALLOC_SYNCED"] = "1"
 
 ## 🧪 テスト
 
+事前準備として、CIと同様に作業用ディレクトリを用意してください：
+
+```bash
+mkdir -p data logs
+```
+
 ### テストスイートの実行
 
 ```bash
-# 全テストを実行
+# 依存関係の再解決（環境が変わった場合に推奨）
+julia --project=. -e "using Pkg; Pkg.resolve(); Pkg.instantiate()"
+
+# 全テストを実行（カバレッジなし）
 julia --project=. test/runtests.jl
 
 # 特定のテストのみ実行
@@ -331,16 +340,54 @@ GitHub Actions により自動実行：
 - ✅ コード品質チェック
 - ✅ 依存関係監査
 
+サポートマトリクス（ci.yml）
+- Julia: 1.9 / 1.10
+- OS: ubuntu-latest / macos-latest / windows-latest（1.10×Windowsは除外設定）
+- 追加ジョブ: Integration Tests / Security Analysis / Docker Build / Coverage（Codecov）
+
+ローカルでCIと同等のジョブを再現するには：
+- 依存解決: `julia --project=. -e "using Pkg; Pkg.resolve(); Pkg.instantiate()"`
+- 統合テスト: `julia --project=. test/test_integration.jl`
+- セキュリティテスト: `julia --project=. test/test_security.jl`
+- 並列度: `JULIA_NUM_THREADS=2`（適宜調整）
+
+既知の注意点（CI結果より）
+- DataFramesのプリコンパイル時に`Statistics`が未解決だと失敗する場合があります。本プロジェクトでは`Project.toml`に`Statistics`を明示追加済みです。環境差異がある場合は上記の「依存解決」を実行してください。
+- Docker Buildは`julia:1.10`をベースにしています。`julia:1.11-slim`は公式に存在しないためビルド失敗の原因になります。
+
+トラブル時の基本対処
+```bash
+julia --project=. -e "using Pkg; Pkg.resolve(); Pkg.instantiate()"
+```
+
+それでも解消しない場合は、`Manifest.toml`のJuliaバージョン差異が原因のことがあります。必要に応じてCIの実行バージョンに合わせて再解決（`Pkg.resolve()`）してください。
+
 ## 📚 ドキュメント
 
 ### API リファレンス
 - **[API仕様書](docs/API_SPECIFICATION.md)** - REST API の仕様（v1/v2対応）
 
 ### 運用ガイド
-- **[運用マニュアル](docs/OPERATIONS_MANUAL.md)** - セットアップ・運用手順
+- **[運用マニュアル](docs/OPERATIONS_MANUAL.md)** - セットアップ・運用手順（Julia 1.9/1.10対応、依存の再解決手順を追記）
 
 ### モダンGUI
 - **[モダンGUIガイド](docs/MODERN_GUI_GUIDE.md)** - UI機能と使い方
+
+## 🐳 Docker
+
+本リポジトリのDockerfileは `julia:1.10` ベースです（`julia:1.11-slim`は存在しないためビルドが失敗します）。
+
+```bash
+# ビルド
+docker build -t julia-stock:latest .
+
+# 起動（ポート8000）
+docker run --rm -p 8000:8000 \
+  -e JWT_SECRET="change-me" \
+  julia-stock:latest
+```
+
+Docker Compose の例は `docker-compose.yml` を参照してください。
 
 ## 🤝 コントリビューション
 

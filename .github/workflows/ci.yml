@@ -35,7 +35,7 @@ jobs:
       
       - name: Install dependencies
         run: |
-          julia --project=. -e "using Pkg; Pkg.instantiate()"
+          julia --project=. -e "using Pkg; Pkg.resolve(); Pkg.instantiate()"
 
       - name: Create test directories (data, logs)
         run: |
@@ -69,7 +69,7 @@ jobs:
           
       - name: Install dependencies
         run: |
-          julia --project=. -e "using Pkg; Pkg.instantiate()"
+          julia --project=. -e "using Pkg; Pkg.resolve(); Pkg.instantiate()"
 
       - name: Create test directories (data, logs)
         run: |
@@ -91,7 +91,7 @@ jobs:
           
       - name: Install dependencies
         run: |
-          julia --project=. -e "using Pkg; Pkg.instantiate()"
+          julia --project=. -e "using Pkg; Pkg.resolve(); Pkg.instantiate()"
 
       - name: Create test directories (data, logs)
         run: |
