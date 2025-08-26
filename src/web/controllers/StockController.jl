@@ -7,9 +7,9 @@ using Dates
 using Genie.Responses
 using Genie.Renderers.Json
 
-include("../../models/Stock.jl")
-include("../../database/ConnectionPool.jl")
-include("../../database/SecureDuckDBConnection.jl")
+using ...StockModel
+using ...ConnectionPool
+using ...SecureDuckDBConnection
 
 """
 全在庫一覧を取得

@@ -51,8 +51,8 @@ function init_logging()
         init_log_file("logs/security.log")
         init_log_file("logs/debug.log")
         
-        # グローバルログレベルの設定
-        global_logger(FileLogger("logs/app.log"))
+        # グローバルロガー設定は使用しない（手動でファイルに構造化ログを書き出す）
+        # ここで外部依存のFileLogger等を使うと未依存で失敗するため除去
         
         log_info("ログシステムが初期化されました")
         

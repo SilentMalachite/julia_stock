@@ -1,6 +1,6 @@
 module ViewHelpers
 
-using Genie.Renderer.Html
+using Genie.Renderers.Html
 using Dates
 
 export form_input, form_select, form_button, form_textarea

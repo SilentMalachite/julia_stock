@@ -9,8 +9,8 @@ using Genie.Responses
 using Genie.Renderers.Json
 using Genie.Requests
 
-include("../../excel/ExcelHandler.jl")
-include("../../models/Stock.jl")
+using ...ExcelHandler
+using ...StockModel
 
 """
 Excelファイルにエクスポート

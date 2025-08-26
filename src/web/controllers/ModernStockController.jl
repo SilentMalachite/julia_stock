@@ -8,10 +8,10 @@ using Genie.Responses
 using Genie.Renderers.Json
 using Genie.Requests
 
-include("../../models/Stock.jl")
-include("../../database/DuckDBConnection.jl")
-include("../../database/ConnectionPool.jl")
-include("../../database/SecureDuckDBConnection.jl")
+using ...StockModel
+using ...DuckDBConnection
+using ...ConnectionPool
+using ...SecureDuckDBConnection
 using DuckDB
 using Random
 
@@ -319,7 +319,7 @@ function validate_stock_data(data::Dict)
     # 商品コードの重複チェック
     if haskey(data, "product_code") && !isempty(get(data, "product_code", ""))
         conn = ConnectionPool.get_connection_from_pool()
-        begin
+        try
             params = Any[data["product_code"]]
             check_query = "SELECT COUNT(*) as count FROM stocks WHERE code = ?"
             if haskey(data, "id")

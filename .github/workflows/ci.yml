@@ -36,13 +36,14 @@ jobs:
       - name: Install dependencies
         run: |
           julia --project=. -e "using Pkg; Pkg.instantiate()"
-          
-      - name: Create test data directory
-        run: mkdir -p data
-          
-      - name: Run tests
+
+      - name: Create test directories (data, logs)
         run: |
-          julia --project=. test/runtests.jl
+          julia -e 'mkpath.( ["data", "logs"] )'
+
+      - name: Run tests (with coverage)
+        run: |
+          julia --project=. --code-coverage=user --color=yes test/runtests.jl
         env:
           JULIA_NUM_THREADS: 2
           
@@ -65,9 +66,10 @@ jobs:
       - name: Install dependencies
         run: |
           julia --project=. -e "using Pkg; Pkg.instantiate()"
-          
-      - name: Create test data directory
-        run: mkdir -p data
+
+      - name: Create test directories (data, logs)
+        run: |
+          julia -e 'mkpath.( ["data", "logs"] )'
           
       - name: Run security tests
         run: |
@@ -86,9 +88,10 @@ jobs:
       - name: Install dependencies
         run: |
           julia --project=. -e "using Pkg; Pkg.instantiate()"
-          
-      - name: Create test data directory
-        run: mkdir -p data
+
+      - name: Create test directories (data, logs)
+        run: |
+          julia -e 'mkpath.( ["data", "logs"] )'
           
       - name: Run integration tests
         run: |

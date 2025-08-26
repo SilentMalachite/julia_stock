@@ -1,6 +1,8 @@
 module InventorySystem
 
 using Dates
+using DataFrames
+using XLSX
 
 # === 正しい依存関係順序でモジュールをロード ===
 
@@ -48,7 +50,7 @@ export Stock, add_quantity, reduce_quantity, filter_by_category, filter_out_of_s
        secure_db_connect, secure_db_close, secure_create_stock_table, secure_table_exists,
        secure_insert_stock, secure_get_all_stocks, secure_get_stock_by_id, secure_update_stock, 
        secure_delete_stock, secure_get_stocks_by_category, secure_get_out_of_stock_items, 
-       secure_get_low_stock_items, secure_execute,
+       secure_get_low_stock_items,
        # 認証システム
        init_auth_database, create_user, authenticate_user, delete_user, get_all_users,
        change_password, is_account_locked, unlock_account, 
@@ -59,9 +61,9 @@ export Stock, add_quantity, reduce_quantity, filter_by_category, filter_out_of_s
        return_connection_to_pool, get_pool_statistics, is_connection_healthy,
        with_transaction, recover_connection_pool, cleanup_idle_connections,
        get_pool_configuration, should_alert_high_usage, detect_connection_leaks,
-       # Excel機能
+       # Excel機能（テスト/ユーティリティ用ラッパー）
        create_empty_excel, export_stocks_to_excel, import_stocks_from_excel,
-       create_stock_template, get_excel_headers, validate_excel_format,
+      create_stock_template, get_excel_headers, validate_excel_format,
        # Web API
        start_api_server, stop_api_server, is_server_running, add_test_stock,
        # システム管理
@@ -133,6 +135,115 @@ function start_server(port::Int = 8000)
         println("❌ システム起動中にエラーが発生しました: $(string(e))")
         rethrow(e)
     end
+end
+
+# =============================
+# Excel ユーティリティ（テスト支援）
+# =============================
+
+const DEFAULT_EXCEL_HEADERS = [
+    :id, :product_code, :product_name, :category, :quantity, :unit,
+    :price, :location, :created_at, :updated_at
+]
+
+function get_excel_headers()::Vector{Symbol}
+    DEFAULT_EXCEL_HEADERS
+end
+
+function create_empty_excel(filepath::AbstractString)::Bool
+    df = DataFrame(
+        :id => Int[],
+        :product_code => String[],
+        :product_name => String[],
+        :category => String[],
+        :quantity => Int[],
+        :unit => String[],
+        :price => Float64[],
+        :location => String[],
+        :created_at => DateTime[],
+        :updated_at => DateTime[]
+    )
+    ExcelHandler.export_to_excel(filepath, df)
+end
+
+function export_stocks_to_excel(stocks::Vector{Stock}, filepath::AbstractString)::Bool
+    df = DataFrame(
+        id = [s.id for s in stocks],
+        product_code = [s.code for s in stocks],
+        product_name = [s.name for s in stocks],
+        category = [s.category for s in stocks],
+        quantity = [s.quantity for s in stocks],
+        unit = [s.unit for s in stocks],
+        price = [s.price for s in stocks],
+        location = [s.location for s in stocks],
+        created_at = [s.created_at for s in stocks],
+        updated_at = [s.updated_at for s in stocks]
+    )
+    ExcelHandler.export_to_excel(filepath, df)
+end
+
+function _normalize_columns!(df::DataFrame)
+    # 日本語→英語のマッピングにも対応
+    rename!(df, 
+        Symbol("商品コード") => :product_code,
+        Symbol("商品名") => :product_name,
+        Symbol("カテゴリ") => :category,
+        Symbol("在庫数") => :quantity,
+        Symbol("単位") => :unit,
+        Symbol("単価") => :price,
+        Symbol("保管場所") => :location;
+        force=true
+    )
+    return df
+end
+
+function validate_excel_format(filepath::AbstractString)::Bool
+    xf = XLSX.readxlsx(filepath)
+    sheet = xf[XLSX.sheetnames(xf)[1]]
+    df = DataFrame(XLSX.gettable(sheet)...)
+    _normalize_columns!(df)
+    required = Set(DEFAULT_EXCEL_HEADERS)
+    present = Set(Symbol.(names(df)))
+    # created_at/updated_at は無い場合も許容
+    required_min = setdiff(required, Set([:created_at, :updated_at]))
+    issubset(required_min, present)
+end
+
+function create_stock_template(filepath::AbstractString)::Bool
+    ExcelHandler.create_template(filepath)
+end
+
+function import_stocks_from_excel(filepath::AbstractString)::Vector{Stock}
+    xf = XLSX.readxlsx(filepath)
+    sheet = xf[XLSX.sheetnames(xf)[1]]
+    df = DataFrame(XLSX.gettable(sheet)...)
+    _normalize_columns!(df)
+    stocks = Stock[]
+    for row in eachrow(df)
+        namesyms = propertynames(row)
+        _get(sym, default) = (sym in namesyms) ? row[sym] : default
+        id_val = try
+            Int(_get(:id, 0))
+        catch
+            0
+        end
+        id = id_val > 0 ? id_val : Int64(round(Dates.datetime2unix(now()) * 1000))
+        name = String(_get(:product_name, ""))
+        code = String(_get(:product_code, ""))
+        category = String(_get(:category, "その他"))
+        unit = String(_get(:unit, "個"))
+        location = String(_get(:location, ""))
+        qv = _get(:quantity, 0)
+        quantity = (qv === missing) ? 0 : Int(qv)
+        pv = _get(:price, 0.0)
+        price = (pv === missing) ? 0.0 : Float64(pv)
+        created = _get(:created_at, now())
+        updated = _get(:updated_at, now())
+        created_at = created === missing ? now() : DateTime(created)
+        updated_at = updated === missing ? now() : DateTime(updated)
+        push!(stocks, Stock(id, name, code, quantity, unit, price, category, location, created_at, updated_at))
+    end
+    stocks
 end
 
 function ensure_default_admin()

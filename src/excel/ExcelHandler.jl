@@ -4,10 +4,20 @@ using XLSX
 using DataFrames
 using Dates
 
-include("../models/Stock.jl")
-include("../database/DuckDBConnection.jl")
-include("../database/ConnectionPool.jl")
-include("../database/SecureDuckDBConnection.jl")
+# 依存モジュールの解決（InventorySystem配下 or 単体include の両対応）
+@static if isdefined(parentmodule(@__MODULE__), :StockModel)
+    using ..StockModel
+else
+    include("../models/Stock.jl"); using .StockModel
+end
+
+# ConnectionPool / SecureDuckDBConnection は実行時に解決（テストのinclude順に対応）
+const _PM = parentmodule(@__MODULE__)
+
+_has_cp() = isdefined(_PM, :ConnectionPool) || isdefined(Main, :ConnectionPool)
+_cp_mod() = isdefined(_PM, :ConnectionPool) ? getfield(_PM, :ConnectionPool) : getfield(Main, :ConnectionPool)
+_has_secure() = isdefined(_PM, :SecureDuckDBConnection) || isdefined(Main, :SecureDuckDBConnection)
+_secure_mod() = isdefined(_PM, :SecureDuckDBConnection) ? getfield(_PM, :SecureDuckDBConnection) : getfield(Main, :SecureDuckDBConnection)
 
 export export_to_excel, import_from_excel
 
@@ -18,9 +28,12 @@ function export_to_excel(filepath::String, data::Union{DataFrame, Nothing}=nothi
     try
         # データが指定されていない場合は、データベースから全在庫を取得
         if isnothing(data)
-            conn = ConnectionPool.get_connection_from_pool()
+            if !_has_cp() || !_has_secure()
+                error("ConnectionPool または SecureDuckDBConnection が利用できません")
+            end
+            conn = _cp_mod().get_connection_from_pool()
             try
-                stocks = SecureDuckDBConnection.secure_get_all_stocks(conn)
+                stocks = _secure_mod().secure_get_all_stocks(conn)
                 data = DataFrame(
                     id = [s.id for s in stocks],
                     product_code = [s.code for s in stocks],
@@ -34,10 +47,7 @@ function export_to_excel(filepath::String, data::Union{DataFrame, Nothing}=nothi
                     updated_at = [s.updated_at for s in stocks]
                 )
             finally
-                try
-                    ConnectionPool.return_connection_to_pool(conn)
-                catch
-                end
+                try _cp_mod().return_connection_to_pool(conn) catch end
             end
         end
         
@@ -116,14 +126,14 @@ function import_from_excel(filepath::String)
                 nowdt = now()
                 id = Int64(round(datetime2unix(now()) * 1000))
                 stock = StockModel.Stock(id, name, code, quantity, unit, price, category, location, nowdt, nowdt)
-                conn = ConnectionPool.get_connection_from_pool()
+                if !_has_cp() || !_has_secure()
+                    error("ConnectionPool または SecureDuckDBConnection が利用できません")
+                end
+                conn = _cp_mod().get_connection_from_pool()
                 try
-                    SecureDuckDBConnection.secure_insert_stock(conn, stock)
+                    _secure_mod().secure_insert_stock(conn, stock)
                 finally
-                    try
-                        ConnectionPool.return_connection_to_pool(conn)
-                    catch
-                    end
+                    try _cp_mod().return_connection_to_pool(conn) catch end
                 end
                 imported_count += 1
                 

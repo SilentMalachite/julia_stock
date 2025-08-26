@@ -49,6 +49,13 @@
 - **一括インポート/エクスポート** 機能
 - **テンプレート** 提供
 
+提供ユーティリティ（`using .InventorySystem` 時に利用可）:
+- `create_empty_excel(path)`: 空の在庫テンプレートを作成
+- `export_stocks_to_excel(stocks, path)`: `Vector{Stock}` をExcelへ出力
+- `import_stocks_from_excel(path)`: Excelから `Vector{Stock}` を読み込み（DB未書込）
+- `create_stock_template(path)`: サンプル行付きテンプレートを作成
+- `get_excel_headers()` / `validate_excel_format(path)`: ヘッダー確認と形式検証
+
 ### 🌍 日本語完全対応
 - **UTF-8** による完全な日本語サポート
 - **マルチバイト文字** の適切な処理

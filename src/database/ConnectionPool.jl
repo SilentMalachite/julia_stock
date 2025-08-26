@@ -3,7 +3,11 @@ module ConnectionPool
 using DuckDB
 using Dates
 using Base.Threads
-using ..ErrorHandling
+@static if isdefined(parentmodule(@__MODULE__), :ErrorHandling)
+    using ..ErrorHandling
+else
+    include("../utils/ErrorHandling.jl"); using .ErrorHandling
+end
 
 export init_connection_pool, cleanup_connection_pool, get_connection_from_pool,
        return_connection_to_pool, get_pool_statistics, get_pool_configuration,
@@ -104,6 +108,7 @@ function cleanup_connection_pool()
     """
     lock(POOL_LOCK) do
         cleanup_connection_pool_internal()
+        POOL_CONFIG[] = nothing
     end
 end
 
@@ -123,7 +128,6 @@ function cleanup_connection_pool_internal()
         end
         
         empty!(CONNECTION_POOL)
-        POOL_CONFIG[] = nothing
         
         log_info("接続プールがクリーンアップされました")
         
@@ -139,6 +143,14 @@ function create_new_connection()::Union{ConnectionInfo, Nothing}
     try
         if POOL_CONFIG[] === nothing
             throw(ArgumentError("接続プールが初期化されていません"))
+        end
+        
+        # DBファイルのディレクトリを確保
+        if POOL_CONFIG[].database_path != ":memory:"
+            try
+                mkpath(dirname(POOL_CONFIG[].database_path))
+            catch
+            end
         end
         
         conn = DuckDB.DB(POOL_CONFIG[].database_path)
