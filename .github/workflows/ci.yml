@@ -52,6 +52,10 @@ jobs:
       - uses: codecov/codecov-action@v3
         with:
           files: lcov.info
+          flags: unittests
+          name: ${{ matrix.os }}-julia-${{ matrix.version }}
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
 
   security:
     name: Security Analysis

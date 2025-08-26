@@ -1,0 +1,41 @@
+codecov:
+  require_ci_to_pass: true
+  notify:
+    after_n_builds: 3
+    wait_for_ci: true
+
+coverage:
+  precision: 2
+  round: down
+  range: "60..100"
+
+parsers:
+  gcov:
+    branch_detection:
+      conditional: true
+      loop: true
+      method: false
+      macro: false
+
+comment:
+  layout: "reach, diff, flags, files"
+  behavior: default
+  require_changes: false
+
+status:
+  project:
+    default:
+      # allow a small drop in overall coverage
+      target: auto
+      threshold: 1%
+  patch:
+    default:
+      # PR must not reduce patch coverage by more than 1%
+      target: 80%
+      threshold: 1%
+
+ignore:
+  - "docs/**"
+  - "public/**"
+  - "views/**"
+  - "**/*.jl.html"
