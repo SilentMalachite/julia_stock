@@ -62,10 +62,10 @@ cd julia_stock
 
 #### 2. 依存関係のインストール/再解決
 
-Juliaの小数点バージョン差異（例: 1.9 ↔ 1.10）を跨ぐ場合に備え、まず`resolve`を行います。
+初回は`instantiate`でレジストリが自動追加されます。環境差異がある場合は続けて`resolve`を実行してください。
 
 ```bash
-julia --project=. -e "using Pkg; Pkg.resolve(); Pkg.instantiate()"
+julia --project=. -e "using Pkg; Pkg.instantiate(); Pkg.resolve()"
 ```
 
 #### 3. ディレクトリ構造の確認
@@ -487,7 +487,7 @@ tail -n 50 logs/error.log
 **解決策**:
 ```bash
 # 依存関係の再解決と再インストール（環境差異の吸収）
-julia --project=. -e "using Pkg; Pkg.resolve(); Pkg.instantiate()"
+julia --project=. -e "using Pkg; Pkg.instantiate(); Pkg.resolve()"
 
 # ポートの変更（必要に応じて）
 # .env ファイルで SERVER_PORT を変更

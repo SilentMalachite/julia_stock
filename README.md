@@ -100,8 +100,8 @@
 git clone https://github.com/SilentMalachite/julia_stock.git
 cd julia_stock
 
-# 依存関係を解決・インストール（Juliaの小数点バージョン差異に対応）
-julia --project=. -e "using Pkg; Pkg.resolve(); Pkg.instantiate()"
+# 依存関係をインストール後、必要に応じて再解決（環境差異対策）
+julia --project=. -e "using Pkg; Pkg.instantiate(); Pkg.resolve()"
 
 # 必要なディレクトリを作成
 mkdir -p data logs backups
@@ -313,7 +313,7 @@ mkdir -p data logs
 
 ```bash
 # 依存関係の再解決（環境が変わった場合に推奨）
-julia --project=. -e "using Pkg; Pkg.resolve(); Pkg.instantiate()"
+julia --project=. -e "using Pkg; Pkg.instantiate(); Pkg.resolve()"
 
 # 全テストを実行（カバレッジなし）
 julia --project=. test/runtests.jl
@@ -346,7 +346,7 @@ GitHub Actions により自動実行：
 - 追加ジョブ: Integration Tests / Security Analysis / Docker Build / Coverage（Codecov）
 
 ローカルでCIと同等のジョブを再現するには：
-- 依存解決: `julia --project=. -e "using Pkg; Pkg.resolve(); Pkg.instantiate()"`
+- 依存解決: `julia --project=. -e "using Pkg; Pkg.instantiate(); Pkg.resolve()"`
 - 統合テスト: `julia --project=. test/test_integration.jl`
 - セキュリティテスト: `julia --project=. test/test_security.jl`
 - 並列度: `JULIA_NUM_THREADS=2`（適宜調整）
@@ -357,7 +357,7 @@ GitHub Actions により自動実行：
 
 トラブル時の基本対処
 ```bash
-julia --project=. -e "using Pkg; Pkg.resolve(); Pkg.instantiate()"
+julia --project=. -e "using Pkg; Pkg.instantiate(); Pkg.resolve()"
 ```
 
 それでも解消しない場合は、`Manifest.toml`のJuliaバージョン差異が原因のことがあります。必要に応じてCIの実行バージョンに合わせて再解決（`Pkg.resolve()`）してください。

@@ -32,7 +32,7 @@ RUN mkdir -p data logs backups && \
 COPY Project.toml Manifest.toml ./
 
 # Julia依存関係をインストール
-RUN julia --project=. -e "using Pkg; Pkg.resolve(); Pkg.instantiate(); Pkg.precompile()"
+RUN julia --project=. -e "using Pkg; Pkg.instantiate(); Pkg.resolve(); Pkg.precompile()"
 
 # アプリケーションファイルをコピー
 COPY --chown=inventory:inventory src/ ./src/
